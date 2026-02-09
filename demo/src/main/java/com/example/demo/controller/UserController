@@ -1,0 +1,38 @@
+package com.example.demo.controller;
+
+import com.example.demo.entity.Role;
+import com.example.demo.entity.User;
+import com.example.demo.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1")
+public class UserController {
+
+    @Autowired
+    private UserService userService;
+
+    @PostMapping("/roles")
+    public Role saveRole(@RequestBody Role role) {
+        return userService.saveRole(role);
+    }
+
+    @GetMapping("/users")
+    public List<User> fetchUserList() {
+        return userService.fetchUser();
+    }
+
+    @PutMapping("/users/{id}")
+    public User updateUser(@RequestBody User user, @PathVariable("id") Long userId) {
+        return userService.updateUser(user, userId);
+    }
+
+    @DeleteMapping("/users/{id}")
+    public String deleteUser(@PathVariable("id") Long userId) {
+        userService.deleteUser(userId);
+        return "Deleted successfully";
+    }
+}

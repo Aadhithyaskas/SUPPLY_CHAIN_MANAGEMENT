@@ -35,4 +35,11 @@ public class UserController {
         userService.deleteUser(userId);
         return "Deleted successfully";
     }
+    @PutMapping("/assignRole/{userId}/{roleId}")
+    public User assignRole(
+            @PathVariable Long userId,
+            @PathVariable Long roleId) {
+        return userService.assignRole(userId, roleId);
+    }
+
 }

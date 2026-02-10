@@ -48,4 +48,19 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Long userId) {
         userRepository.deleteById(userId);
     }
+   @Override
+   public User assignRole(Long userId, Long roleId) {
+
+       User userDB = userRepository.findById(userId)
+               .orElseThrow(() -> new RuntimeException("User not found"));
+
+       Role roleDB = roleRepository.findById(roleId)
+               .orElseThrow(() -> new RuntimeException("Role not found"));
+
+       userDB.saveRole(roleDB);
+
+       return userRepository.save(userDB);
+   }
+
+
 }

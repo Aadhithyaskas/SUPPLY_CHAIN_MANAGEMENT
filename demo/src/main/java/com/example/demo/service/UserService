@@ -9,4 +9,5 @@ public interface UserService {
     List<User> fetchUser();
     User updateUser(User user, Long userId);
     void deleteUser(Long userId);
+    User assignRole(Long userId, Long roleId)
 }

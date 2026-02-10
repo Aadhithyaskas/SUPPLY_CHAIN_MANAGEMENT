@@ -10,6 +10,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 }
 
 // You'll also need this for the Role entity
-@Repository
-interface RoleRepository extends JpaRepository<Role, Long> {
-}
+//@Repository
+//interface RoleRepository extends JpaRepository<Role, Long> {
+//}

@@ -1,0 +1,45 @@
+package com.example.demo.entity;
+
+import lombok.*;
+import javax.persistence.*;
+import java.util.List;
+
+@Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Manager {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL)
+    private List<PurchaseOrder> purchaseOrders;
+
+    @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL)
+    private List<Logistics> logisticsList;
+
+    @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL)
+    private List<SalesOrder> salesOrders;
+
+    @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL)
+    private List<Employee> employees;
+
+    @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL)
+    private List<Inventory> inventories;
+
+    @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL)
+    private List<OrderProcessing> orderProcessings;
+
+    @OneToMany(mappedBy = "manager", cascade = CascadeType.ALL)
+    private List<Expense> expenses;
+}

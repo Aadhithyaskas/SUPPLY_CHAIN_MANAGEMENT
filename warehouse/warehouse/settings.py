@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -83,16 +84,21 @@ WSGI_APPLICATION = 'warehouse.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+
+
+# Replace the default DATABASES section
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'Warehouse',       # Create this database in Postgres first
-        'USER': 'postgres',
+        'NAME': 'postgres',
+        'USER': 'postgres.bmklsdcwzirovmdhiwrg',
         'PASSWORD': 'Aadhi@mamcet26',
-        'HOST': 'db.bmklsdcwzirovmdhiwrg.supabase.co',
+        'HOST': 'aws-1-ap-northeast-2.pooler.supabase.com',
         'PORT': '5432',
+        'CONN_MAX_AGE': 0,
     }
 }
+
 
 
 # Password validation

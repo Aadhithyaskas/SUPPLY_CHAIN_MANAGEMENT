@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from django.db import models
 from django.utils import timezone
 
@@ -168,3 +169,5 @@ class PerformanceTerms(models.Model):
     warning_threshold = models.DecimalField(max_digits=5, decimal_places=2)
     suspension_threshold = models.DecimalField(max_digits=5, decimal_places=2)
     penalty_percentage = models.DecimalField(max_digits=5, decimal_places=2)
+=======
+>>>>>>> 006bbb737ea685ce7cafc1c90ff76edff0e7bb16

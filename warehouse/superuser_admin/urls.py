@@ -1,11 +1,8 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import AuthViewSet, ZoneViewSet
+# inventory/urls.py
 
-router = DefaultRouter()
-router.register("zones", ZoneViewSet, basename="zones")
+from django.urls import path
+from .views import register
 
 urlpatterns = [
-    path("login/", AuthViewSet.as_view({"post": "login"}), name="login"),
-    path("", include(router.urls)),
+    path("register/", register, name="register"),
 ]

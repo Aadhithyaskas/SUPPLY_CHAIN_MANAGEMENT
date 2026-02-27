@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     'inventory',
     'order_processing',
     'quarantine',
-    
     'customers',
     'customer_agreements',
     ]
@@ -105,17 +104,14 @@ DATABASES = {
         'USER': 'postgres.bmklsdcwzirovmdhiwrg',
         'PASSWORD': 'Aadhi@mamcet26',
         'HOST': 'aws-1-ap-northeast-2.pooler.supabase.com',
-        'PORT': '6543',
-        'OPTIONS': {
-            'sslmode': 'require',
-        },
+        'PORT': '5432',
+        'CONN_MAX_AGE': 0,
     }
 }
 
 
 
-
-# Password validation
+# Password validation  
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -150,3 +146,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

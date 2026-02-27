@@ -1,5 +1,9 @@
 from rest_framework import serializers
+<<<<<<< HEAD
+from .models import User
+=======
 from .models import User, Role
+>>>>>>> f8f42d08ea32b8d47df291409f1ccdb95f990d4d
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     # We define role as a choice/string to make React integration easier
@@ -13,6 +17,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'company_name', 'gstin', 'department', 'qualification'
         ]
 
+<<<<<<< HEAD
+=======
     def validate(self, data):
         """
         Custom validation logic based on the Role.
@@ -51,3 +57,4 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return user
+>>>>>>> f8f42d08ea32b8d47df291409f1ccdb95f990d4d

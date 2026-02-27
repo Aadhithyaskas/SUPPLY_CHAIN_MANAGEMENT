@@ -105,10 +105,13 @@ DATABASES = {
         'USER': 'postgres.bmklsdcwzirovmdhiwrg',
         'PASSWORD': 'Aadhi@mamcet26',
         'HOST': 'aws-1-ap-northeast-2.pooler.supabase.com',
-        'PORT': '5432',
-        'CONN_MAX_AGE': 0,
+        'PORT': '6543',
+        'OPTIONS': {
+            'sslmode': 'require',
+        },
     }
 }
+
 
 
 

@@ -20,7 +20,7 @@ class Role(models.Model):
         return self.name
 
 
-class User(AbstractUser):
+class User(AbstractUser):  # ✅ MUST extend AbstractUser
 
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True)
 

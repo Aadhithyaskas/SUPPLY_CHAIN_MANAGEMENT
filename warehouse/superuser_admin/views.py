@@ -5,7 +5,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 
-from .models import Zone
+# from .models import Zone
 from .serializers import ZoneSerializer
 from .permissions import IsFounder
 
@@ -37,10 +37,10 @@ class AuthViewSet(viewsets.ViewSet):
         })
 
 
-class ZoneViewSet(viewsets.ModelViewSet):
-    queryset = Zone.objects.all()
-    serializer_class = ZoneSerializer
-    permission_classes = [IsAuthenticated, IsFounder]
+# class ZoneViewSet(viewsets.ModelViewSet):
+#     queryset = Zone.objects.all()
+#     serializer_class = ZoneSerializer
+#     permission_classes = [IsAuthenticated, IsFounder]
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+#     def perform_create(self, serializer):
+#         serializer.save(created_by=self.request.user)

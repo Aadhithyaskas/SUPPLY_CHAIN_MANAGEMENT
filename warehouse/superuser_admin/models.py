@@ -36,16 +36,16 @@ class User(AbstractUser):
         return f"{self.username} - {self.role.name if self.role else 'No Role'}"
 
 
-class Zone(models.Model):
-    ZONE_TYPES = [
-        ("COLD", "Cold"),
-        ("DRY", "Dry"),
-        ("HAZ", "Hazardous"),
-    ]
+# class Zone(models.Model):
+#     ZONE_TYPES = [
+#         ("COLD", "Cold"),
+#         ("DRY", "Dry"),
+#         ("HAZ", "Hazardous"),
+#     ]
 
-    name = models.CharField(max_length=100)
-    zone_type = models.CharField(max_length=10, choices=ZONE_TYPES)
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+#     name = models.CharField(max_length=100)
+#     zone_type = models.CharField(max_length=10, choices=ZONE_TYPES)
+#     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
 
-    def __str__(self):
-        return self.name
+#     def __str__(self):
+#         return self.name

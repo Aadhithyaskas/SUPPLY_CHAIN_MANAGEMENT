@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from django.db import models
 from django.utils import timezone
 
@@ -70,6 +69,16 @@ class PricingSlab(models.Model):
     max_quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
 
+class Vendor(models.Model):
+    name = models.CharField(max_length=255)
+    vendor_code = models.CharField(max_length=50, unique=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+    
 class PaymentTerms(models.Model):
 
     agreement = models.OneToOneField(
@@ -169,5 +178,4 @@ class PerformanceTerms(models.Model):
     warning_threshold = models.DecimalField(max_digits=5, decimal_places=2)
     suspension_threshold = models.DecimalField(max_digits=5, decimal_places=2)
     penalty_percentage = models.DecimalField(max_digits=5, decimal_places=2)
-=======
->>>>>>> 006bbb737ea685ce7cafc1c90ff76edff0e7bb16
+

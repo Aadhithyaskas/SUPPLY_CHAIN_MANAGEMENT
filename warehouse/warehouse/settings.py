@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'inbound',
     'finance',
-    'vendor_agreement',
+  
     'logistics',
     'outbound',
     'inventory',

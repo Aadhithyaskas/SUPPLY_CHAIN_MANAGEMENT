@@ -1,38 +1,39 @@
+# inventory/models.py
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
+
 class Role(models.Model):
-    FOUNDER = "FOUNDER"
-    ADMIN = "ADMIN"
-    MANAGER = "MANAGER"
-    SUPERVISOR = "SUPERVISOR"
-    INV_LOGGER = "INV_LOGGER"
-    FINANCE_DIR = "FINANCE_DIR"
-    DISTRIBUTOR = "DISTRIBUTOR"
-    VENDOR = "VENDOR"
 
     ROLE_CHOICES = [
-        (FOUNDER, "Founder"),
-        (ADMIN, "Admin"),
-        (MANAGER, "Manager"),
-        (SUPERVISOR, "Supervisor"),
-        (INV_LOGGER, "Inventory Logger"),
-        (FINANCE_DIR, "Finance Director"),
-        (DISTRIBUTOR, "Distributor"),
-        (VENDOR, "Vendor"),
+        ("FOUNDER", "Founder"),
+        ("MANAGER", "Manager"),
+        ("SUPERVISOR", "Supervisor"),
+        ("QUALITY_CHECKER", "Quality Checker"),
+        ("INVENTORY_LOGGER", "Inventory Logger"),
     ]
 
-    name = models.CharField(max_length=20, choices=ROLE_CHOICES, unique=True)
+    name = models.CharField(max_length=30, choices=ROLE_CHOICES, unique=True)
 
     def __str__(self):
         return self.name
 
 
 class User(AbstractUser):
+
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True)
-    employee_id = models.CharField(max_length=50, unique=True)
+
+    # Founder fields
+    company_name = models.CharField(max_length=100, null=True, blank=True)
+    gstin = models.CharField(max_length=20, null=True, blank=True)
+
+    # Employee fields
+    department = models.CharField(max_length=100, null=True, blank=True)
+    qualification = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
+<<<<<<< HEAD
         return f"{self.username} - {self.role.name if self.role else 'No Role'}"
 
 
@@ -49,3 +50,6 @@ class User(AbstractUser):
 
 #     def __str__(self):
 #         return self.name
+=======
+        return f"{self.username} - {self.role}"
+>>>>>>> f8f42d08ea32b8d47df291409f1ccdb95f990d4d

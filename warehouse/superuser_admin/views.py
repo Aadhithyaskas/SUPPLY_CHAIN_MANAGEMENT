@@ -1,10 +1,10 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
-from django.contrib.auth import authenticate
-from rest_framework.permissions import IsAuthenticated
+from .serializers import UserRegistrationSerializer
 
+<<<<<<< HEAD
 # from .models import Zone
 from .serializers import ZoneSerializer
 from .permissions import IsFounder
@@ -44,3 +44,19 @@ class AuthViewSet(viewsets.ViewSet):
 
 #     def perform_create(self, serializer):
 #         serializer.save(created_by=self.request.user)
+=======
+@api_view(["POST"])
+@permission_classes([AllowAny]) # Anyone can register
+def register(request):
+    serializer = UserRegistrationSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {"message": "User registered successfully"}, 
+            status=status.HTTP_201_CREATED
+        )
+    
+    # Returns structured errors (e.g. {"username": ["Already exists"]}) to React
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> f8f42d08ea32b8d47df291409f1ccdb95f990d4d

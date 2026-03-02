@@ -32,15 +32,16 @@ def generate_otp():
 
 
 def send_otp_email(email, purpose):
-    otp_code = generate_otp()
 
+    otp_code = generate_otp()
     expiry = timezone.now() + timedelta(minutes=5)
 
     OTP.objects.create(
         email=email,
         otp_code=otp_code,
         purpose=purpose,
-        expiry_time=expiry
+        expiry_time=expiry,
+        is_used=False
     )
 
     send_mail(

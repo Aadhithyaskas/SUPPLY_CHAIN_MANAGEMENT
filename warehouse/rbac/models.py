@@ -11,6 +11,7 @@ class Role(models.Model):
         ("quality_assistant", "Quality Assistant"),
         ("admin", "Admin"),
         ("manager", "Manager"),
+        ("supervisor","Supervisor")
     )
 
     name = models.CharField(max_length=50, choices=ROLE_CHOICES, unique=True)

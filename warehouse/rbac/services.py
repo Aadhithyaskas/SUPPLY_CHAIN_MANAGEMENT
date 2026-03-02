@@ -6,8 +6,12 @@ def has_permission(user, model_name, action):
     if not user.is_authenticated:
         return False
 
+    # Superuser bypass (very important)
+    if user.is_superuser:
+        return True
+
     try:
-        user_role = UserRole.objects.get(user=user)
+        user_role = UserRole.objects.select_related("role").get(user=user)
     except UserRole.DoesNotExist:
         return False
 

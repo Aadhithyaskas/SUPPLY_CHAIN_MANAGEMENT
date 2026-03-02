@@ -4,12 +4,16 @@ from pathlib import Path
 # settings.py
 from datetime import timedelta
 
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'rest_framework_simplejwt.authentication.JWTAuthentication',
+#     ),
+# }
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -35,12 +39,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third Party
     'rest_framework',
-    
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
+
     # Your App
-    'rbac.apps.RbacConfig', # Using the Config class ensures signals load
+    'rbac.apps.RbacConfig' # Using the Config class ensures signals load
 ]
 
 MIDDLEWARE = [
@@ -100,9 +106,25 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'ganuu1121@gmail.com'
+EMAIL_HOST_PASSWORD = 'jzbk opmk rabh ivax'
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+
+
+
+
+
+
 # REST Framework Settings
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-    ],
-}
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': [
+#         'rest_framework.authentication.SessionAuthentication',
+#     ],
+# }

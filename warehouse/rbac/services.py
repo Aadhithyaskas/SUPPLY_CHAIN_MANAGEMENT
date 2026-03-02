@@ -1,4 +1,9 @@
+import random
 from .models import UserRole, Permission
+from django.core.mail import send_mail
+from django.utils import timezone
+from datetime import timedelta
+from .models import OTP
 
 
 def has_permission(user, model_name, action):
@@ -20,3 +25,27 @@ def has_permission(user, model_name, action):
         model_name=model_name,
         action=action
     ).exists()
+
+
+def generate_otp():
+    return str(random.randint(100000, 999999))
+
+
+def send_otp_email(email, purpose):
+    otp_code = generate_otp()
+
+    expiry = timezone.now() + timedelta(minutes=5)
+
+    OTP.objects.create(
+        email=email,
+        otp_code=otp_code,
+        purpose=purpose,
+        expiry_time=expiry
+    )
+
+    send_mail(
+        subject="Your OTP Code",
+        message=f"Your OTP is {otp_code}. It expires in 5 minutes.",
+        from_email=None,
+        recipient_list=[email],
+    )

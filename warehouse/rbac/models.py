@@ -1,9 +1,8 @@
 from django.db import models
 from django.conf import settings
-
-
-
-
+from django.utils import timezone
+from datetime import timedelta
+from django.contrib.auth import get_user_model
 
 class Role(models.Model):
 
@@ -43,3 +42,28 @@ class UserRole(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.role.name}"
+    
+    
+
+User = get_user_model()
+
+class OTP(models.Model):
+
+    PURPOSE_CHOICES = (
+        ("REGISTER", "Register"),
+        ("RESET_PASSWORD", "Reset Password"),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    email = models.EmailField()
+    otp_code = models.CharField(max_length=6)
+    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES)
+    expiry_time = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        return timezone.now() > self.expiry_time
+
+    def __str__(self):
+        return f"{self.email} - {self.purpose}"

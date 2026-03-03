@@ -40,9 +40,11 @@ class Permission(models.Model):
 class UserRole(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     role = models.ForeignKey(Role, on_delete=models.CASCADE)
+    is_first_login = models.BooleanField(default=True)   # ADD THIS
 
     def __str__(self):
         return f"{self.user.username} - {self.role.name}"
+
     
     
 
@@ -53,6 +55,7 @@ class OTP(models.Model):
     PURPOSE_CHOICES = (
         ("REGISTER", "Register"),
         ("RESET_PASSWORD", "Reset Password"),
+        ("LOGIN", "Login"),
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)

@@ -4,6 +4,12 @@ from django.core.mail import send_mail
 from django.utils import timezone
 from datetime import timedelta
 from .models import OTP
+import string
+
+def generate_random_password(length=10):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
+
 
 
 def has_permission(user, model_name, action):

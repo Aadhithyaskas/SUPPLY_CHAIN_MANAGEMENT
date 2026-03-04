@@ -5,7 +5,7 @@ from rest_framework import status
 from .models import Role, UserRole
 from django.utils import timezone
 from .models import OTP
-from vendors.models import Vendor
+# from vendors.models import Vendor
 from .services import send_otp_email
 from .serializers import RegisterSerializer, LoginSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
 from .serializers import LoginSerializer,ResetPasswordSerializer,ResetPasswordSerializer

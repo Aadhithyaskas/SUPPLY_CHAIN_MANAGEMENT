@@ -1,7 +1,8 @@
-# models.py
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from datetime import timedelta
+from django.contrib.auth import get_user_model
 
 class Role(models.Model):
 
@@ -10,7 +11,7 @@ class Role(models.Model):
         ("quality_assistant", "Quality Assistant"),
         ("admin", "Admin"),
         ("manager", "Manager"),
-        ("supervisor", "Supervisor"),
+        ("supervisor","Supervisor")
     )
 
     name = models.CharField(max_length=50, choices=ROLE_CHOICES, unique=True)
@@ -19,8 +20,8 @@ class Role(models.Model):
         return self.get_name_display()
 
 
-class Permission(models.Model):
 
+class Permission(models.Model):
     ACTION_CHOICES = (
         ("create", "Create"),
         ("read", "Read"),
@@ -39,11 +40,15 @@ class Permission(models.Model):
 class UserRole(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     role = models.ForeignKey(Role, on_delete=models.CASCADE)
-    is_first_login = models.BooleanField(default=True)
+    is_first_login = models.BooleanField(default=True)   # ADD THIS
 
     def __str__(self):
         return f"{self.user.username} - {self.role.name}"
 
+    
+    
+
+User = get_user_model()
 
 class OTP(models.Model):
 
@@ -53,7 +58,7 @@ class OTP(models.Model):
         ("LOGIN", "Login"),
     )
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     email = models.EmailField()
     otp_code = models.CharField(max_length=6)
     purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES)

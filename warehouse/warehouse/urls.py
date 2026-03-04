@@ -15,5 +15,5 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("create-vendor/", CreateVendorView.as_view(), name="create-vendor"),
     path("api/", include("vendors.urls")),
-    # path('api/', include('rbac.urls')),
+    path('api/', include('rbac.urls')),
 ]

@@ -6,8 +6,8 @@ from .models import Role, UserRole
 from django.utils import timezone
 from .models import OTP
 from vendors.models import Vendor
-from .services import send_otp_email, send_vendor_invitation
-from .serializers import RegisterSerializer, VendorSerializer, LoginSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
+from .services import send_otp_email
+from .serializers import RegisterSerializer, LoginSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
 from .serializers import LoginSerializer,ResetPasswordSerializer,ResetPasswordSerializer
 from django.contrib.auth import authenticate, login
 from .services import generate_random_password

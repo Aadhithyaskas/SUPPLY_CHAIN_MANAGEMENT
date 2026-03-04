@@ -5,16 +5,17 @@ from rest_framework import status
 from .models import Role, UserRole
 from django.utils import timezone
 from .models import OTP
+<<<<<<< HEAD
 # from vendors.models import Vendor
+=======
+>>>>>>> 16c4921912e8a2185f549247799bdca21486ed21
 from .services import send_otp_email
-from .serializers import RegisterSerializer, LoginSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
+from .serializers import RegisterSerializer
 from .serializers import LoginSerializer,ResetPasswordSerializer,ResetPasswordSerializer
 from django.contrib.auth import authenticate, login
 from .services import generate_random_password
 from django.core.mail import send_mail
-from rest_framework.permissions import IsAuthenticated
-
-
+# from rest_framework.permissions import IsAuthenticated
 User = get_user_model()
 
 class AdminCreateUserView(APIView):
@@ -307,20 +308,3 @@ class ResetPasswordView(APIView):
         otp.save()
 
         return Response({"message": "Password reset successful"})
-
-class CreateVendorView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        serializer = VendorSerializer(data=request.data)
-
-        if serializer.is_valid():
-            vendor = serializer.save()
-            send_vendor_invitation(vendor)
-
-            return Response(
-                {"message": "Vendor created successfully. Invitation email sent."},
-                status=status.HTTP_201_CREATED
-            )
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

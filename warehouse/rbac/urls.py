@@ -7,10 +7,8 @@ from .views import (
     ResetPasswordView,
     AdminCreateUserView,
     VerifyLoginOTPView,
-    ForceChangePasswordView,
-    
+    ForceChangePasswordView
 )
-from vendors.views import CreateVendorView
 
 urlpatterns = [
     # 🔐 Registration
@@ -26,5 +24,5 @@ urlpatterns = [
     path('admin-create-user/', AdminCreateUserView.as_view(), name='admin-create-user'),
     path('verify-login-otp/', VerifyLoginOTPView.as_view(), name='verify-login-otp'),
     path('force-change-password/', ForceChangePasswordView.as_view(), name='force-change-password'),
-    path("vendors/create/", CreateVendorView.as_view(), name="create-vendor")
+
 ]

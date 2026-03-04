@@ -44,8 +44,11 @@ class UserRole(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.role.name}"
-User = get_user_model()
 
+    
+    
+
+User = get_user_model()
 
 class OTP(models.Model):
 
@@ -68,4 +71,3 @@ class OTP(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.purpose}"
-    

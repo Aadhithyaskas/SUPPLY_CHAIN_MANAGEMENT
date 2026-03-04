@@ -64,3 +64,18 @@ WMS Team
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class ListVendorView(APIView):
+    
+    def get(self, request):
+
+        vendors = Vendor.objects.all().order_by('lead_time')
+
+        serializer = VendorSerializer(vendors, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+    
+ 
+        

@@ -109,13 +109,6 @@ EMAIL_HOST_USER = 'ganuu1121@gmail.com'
 EMAIL_HOST_PASSWORD = 'jzbk opmk rabh ivax'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-
-
-
-
-
-
-
 # REST Framework Settings
 # REST_FRAMEWORK = {
 #     'DEFAULT_AUTHENTICATION_CLASSES': [

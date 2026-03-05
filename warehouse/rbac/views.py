@@ -36,21 +36,24 @@ class LogoutView(APIView):
         )
 
 class AdminCreateUserView(APIView):
-    
     def post(self, request):
-
         username = request.data.get("username")
         email = request.data.get("email")
         role_name = request.data.get("role")
 
+        # 1. Validation
         if not username or not email or not role_name:
-            return Response({"error": "All fields required"}, status=400)
+            return Response({"error": "All fields required"}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(username=username).exists():
-            return Response({"error": "User already exists"}, status=400)
+            return Response({"error": "User already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if email exists to prevent duplicates
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # 2. Logic
         password = generate_random_password()
-
         role, _ = Role.objects.get_or_create(name=role_name)
 
         user = User.objects.create_user(
@@ -59,16 +62,21 @@ class AdminCreateUserView(APIView):
             password=password
         )
 
-        UserRole.objects.create(user=user, role=role)
+        UserRole.objects.create(user=user, role=role, is_first_login=True)
 
+        # 3. Communication
         send_mail(
             subject="Your Account Password",
-            message=f"Your login password is: {password}",
+            message=f"Your login password is: {password} and your User ID is: {user.id}",
             from_email=None,
             recipient_list=[email],
         )
 
-        return Response({"message": "User created and password sent"})
+        # 4. Corrected Response (Merged dictionaries)
+        return Response({
+            "message": "User created and password sent",
+            "id": user.id
+        }, status=status.HTTP_201_CREATED)
 
 class LoginView(APIView):
     # Fixed: get_client_ip must take 'self' if it's inside the class, 

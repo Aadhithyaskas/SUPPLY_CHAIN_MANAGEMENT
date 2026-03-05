@@ -17,8 +17,6 @@ from django.core.mail import send_mail
 # from rest_framework.permissions import IsAuthenticated
 User = get_user_model()
 
-
-
 class LogoutView(APIView):
 
     def post(self, request):
@@ -72,47 +70,6 @@ class AdminCreateUserView(APIView):
 
         return Response({"message": "User created and password sent"})
 
-class VerifyRegisterOTPView(APIView):
-
-    def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
-
-        data = serializer.validated_data
-
-        otp = OTP.objects.filter(
-            email=data["email"],
-            otp_code=data["otp"],
-            purpose="REGISTER",
-            is_used=False
-        ).last()
-
-        if not otp:
-            return Response({"error": "Invalid OTP"}, status=400)
-
-        if otp.is_expired():
-            return Response({"error": "OTP expired"}, status=400)
-
-        otp.is_used = True
-        otp.save()
-
-        role, _ = Role.objects.get_or_create(name=data["role"])
-
-        user = User.objects.create_user(
-            username=data["username"],
-            email=data["email"],
-            password=data["password"]
-        )
-
-        UserRole.objects.create(user=user, role=role)
-
-        # ✅ Session Login
-        login(request, user)
-
-        return Response({"message": "User registered successfully"})
-
 class LoginView(APIView):
     # Fixed: get_client_ip must take 'self' if it's inside the class, 
     # OR be a staticmethod. I'll make it a staticmethod for easier access.
@@ -164,17 +121,24 @@ class LoginView(APIView):
         )
 
         return Response({
-            "message": "OTP sent",
-            "email": email # Returning email for the next step
-        })
+             "message": "OTP sent",
+             "email": email,
+             "user_id": user.id
+})
 
 class VerifyLoginOTPView(APIView):
+    
     def post(self, request):
-        email = request.data.get("email") # Use email to identify
+
+        user_id = request.data.get("user_id")
         otp_code = request.data.get("otp")
 
-        user = User.objects.filter(email=email).first()
-        if not user:
+        if not user_id or not otp_code:
+            return Response({"error": "user_id and otp required"}, status=400)
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
 
         otp = OTP.objects.filter(
@@ -182,27 +146,37 @@ class VerifyLoginOTPView(APIView):
             otp_code=otp_code,
             purpose="LOGIN",
             is_used=False
-        ).last()
+        ).order_by("-created_at").first()
 
-        if not otp or otp.is_expired():
-            return Response({"error": "Invalid or expired OTP"}, status=400)
+        if not otp:
+            return Response({"error": "Invalid OTP"}, status=400)
+
+        if otp.is_expired():
+            return Response({"error": "OTP expired"}, status=400)
 
         otp.is_used = True
         otp.save()
 
         login(request, user)
-        
-        # Update the LoginLog to success
-        log = LoginLogs.objects.filter(user=user).last()
+
+        # Update login log
+        log = LoginLogs.objects.filter(
+    user=user,
+    login_status=False
+).last()
+
+
         if log:
             log.login_status = True
             log.save()
 
         user_role = UserRole.objects.get(user=user)
+
         return Response({
             "message": "Login successful",
             "force_change_password": user_role.is_first_login
         })
+        
 class ForceChangePasswordView(APIView):
     # permission_classes = [IsAuthenticated]
     def post(self, request):

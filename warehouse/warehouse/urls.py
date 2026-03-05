@@ -3,17 +3,18 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
-    
 )
-
-from vendors.views import CreateVendorView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
+    # JWT Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path("create-vendor/", CreateVendorView.as_view(), name="create-vendor"),
-    path("api2/", include("vendors.urls")),
-    path('api/', include('rbac.urls')),
+
+    # RBAC APIs
+    path('api/auth/', include('rbac.urls')),
+
+    # Vendor APIs
+    path('api/vendors/', include('vendors.urls')),
 ]

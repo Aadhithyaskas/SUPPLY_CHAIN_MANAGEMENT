@@ -6,13 +6,10 @@ from .models import Role, UserRole
 from django.utils import timezone
 from .models import OTP
 # from vendors.models import Vendor
-<<<<<<< HEAD
-=======
 
->>>>>>> ee3f5eee8da2f0a672e94f332a0fd53ec2d16837
 from .services import send_otp_email
 from .serializers import RegisterSerializer
-from .serializers import LoginSerializer,ResetPasswordSerializer,ResetPasswordSerializer
+from .serializers import LoginSerializer,ResetPasswordSerializer,ResetPasswordSerializer,ForgotPasswordSerializer
 from django.contrib.auth import authenticate, login
 from .services import generate_random_password
 from django.core.mail import send_mail

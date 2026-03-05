@@ -1,6 +1,4 @@
-from django.shortcuts import render
-
-# Create your views here.
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -20,7 +18,6 @@ class CreateVendorView(APIView):
         if serializer.is_valid():
             vendor = serializer.save()
 
-            # Fetch warehouse details
             warehouse = vendor.warehouse
 
             subject = "Welcome to Our Warehouse Management System"
@@ -45,7 +42,6 @@ Inventory Manager:
 Name: {warehouse.inventory_manager_name}
 Phone: {warehouse.inventory_manager_phone}
 
-
 Thank You,
 WMS Team
 """
@@ -64,9 +60,10 @@ WMS Team
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
 class ListVendorView(APIView):
-    
+
     def get(self, request):
 
         vendors = Vendor.objects.all().order_by('lead_time')
@@ -76,6 +73,30 @@ class ListVendorView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-    
- 
-        
+class DeleteVendor(APIView):
+
+    def delete(self, request, pk):
+
+        vendor = get_object_or_404(Vendor, pk=pk)
+
+        vendor.delete()
+
+        return Response(
+            {"message": "Vendor deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+
+class UpdateVendor(APIView):
+
+    def put(self, request, pk):
+
+        vendor = get_object_or_404(Vendor, pk=pk)
+
+        serializer = VendorSerializer(vendor, data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

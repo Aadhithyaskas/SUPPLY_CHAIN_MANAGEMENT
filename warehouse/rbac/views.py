@@ -5,8 +5,9 @@ from rest_framework import status
 from .models import Role, UserRole
 from django.utils import timezone
 from .models import OTP
+from django.utils.timezone import now
 # from vendors.models import Vendor
-
+from .models import LoginLogs
 from .services import send_otp_email
 from .serializers import RegisterSerializer
 from .serializers import LoginSerializer,ResetPasswordSerializer,ResetPasswordSerializer,ForgotPasswordSerializer
@@ -15,6 +16,26 @@ from .services import generate_random_password
 from django.core.mail import send_mail
 # from rest_framework.permissions import IsAuthenticated
 User = get_user_model()
+
+
+
+class LogoutView(APIView):
+
+    def post(self, request):
+
+        log = LoginLogs.objects.filter(
+            user=request.user,
+            login_status=True
+        ).last()
+
+        if log:
+            log.logout_time = now()
+            log.save()
+
+        return Response(
+            {"message": "Logged out successfully"},
+            status=status.HTTP_200_OK
+        )
 
 class AdminCreateUserView(APIView):
     
@@ -51,38 +72,6 @@ class AdminCreateUserView(APIView):
 
         return Response({"message": "User created and password sent"})
 
-
-# class RegisterView(APIView):
-    # def post(self, request):
-    #     username = request.data.get("username")
-    #     password = request.data.get("password")
-    #     role_name = request.data.get("role")
-
-    #     if not username or not password or not role_name:
-    #         return Response(
-    #             {"error": "Username, password and role are required"},
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
-
-    #     if User.objects.filter(username=username).exists():
-    #         return Response(
-    #             {"error": "User already exists"},
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
-
-    #     role, created = Role.objects.get_or_create(name=role_name)
-
-    #     user = User.objects.create_user(
-    #         username=username,
-    #         password=password
-    #     )
-
-    #     UserRole.objects.create(user=user, role=role)
-
-    #     return Response(
-    #         {"message": "User registered successfully"},
-    #         status=status.HTTP_201_CREATED
-    #     )
 class VerifyRegisterOTPView(APIView):
 
     def post(self, request):
@@ -125,38 +114,68 @@ class VerifyRegisterOTPView(APIView):
         return Response({"message": "User registered successfully"})
 
 class LoginView(APIView):
-    
+    # Fixed: get_client_ip must take 'self' if it's inside the class, 
+    # OR be a staticmethod. I'll make it a staticmethod for easier access.
+    @staticmethod
+    def get_client_ip(request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
     def post(self, request):
-
         serializer = LoginSerializer(data=request.data)
-
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
-        username = serializer.validated_data["username"]
-        password = serializer.validated_data["password"]
+        # UPDATED: Getting email instead of username
+        email = serializer.validated_data.get("email")
+        password = serializer.validated_data.get("password")
+        user_id = serializer.validated_data.get("user_id")
 
-        user = authenticate(username=username, password=password)
+        # 1. Identify user by email
+        try:
+           user_obj = User.objects.get(id=user_id, email=email)
+        except User.DoesNotExist:
+           return Response({"error": "Invalid credentials"}, status=401)
+
+
+        # 2. Authenticate using the username associated with that email
+        user = authenticate(username=user_obj.username, password=password)
 
         if not user:
             return Response({"error": "Invalid credentials"}, status=401)
 
-        # 🔥 Instead of login() here, send OTP
+        # Logic remains the same: Send OTP, don't login yet
         send_otp_email(user.email, "LOGIN")
+        
+        # Fixed: Call static method using class name or self
+        ip = self.get_client_ip(request)
+        device = request.META.get('HTTP_USER_AGENT')
+
+        # Log the login attempt
+        LoginLogs.objects.create(
+            user=user,
+            ip_address=ip,
+            device_info=device,
+            login_status=False # Should be False until OTP is verified
+        )
 
         return Response({
             "message": "OTP sent",
-            "username": username
+            "email": email # Returning email for the next step
         })
 
 class VerifyLoginOTPView(APIView):
-    
     def post(self, request):
-
-        username = request.data.get("username")
+        email = request.data.get("email") # Use email to identify
         otp_code = request.data.get("otp")
 
-        user = User.objects.get(username=username)
+        user = User.objects.filter(email=email).first()
+        if not user:
+            return Response({"error": "User not found"}, status=404)
 
         otp = OTP.objects.filter(
             email=user.email,
@@ -165,27 +184,25 @@ class VerifyLoginOTPView(APIView):
             is_used=False
         ).last()
 
-        if not otp:
-            return Response({"error": "Invalid OTP"}, status=400)
-
-        if otp.is_expired():
-            return Response({"error": "OTP expired"}, status=400)
+        if not otp or otp.is_expired():
+            return Response({"error": "Invalid or expired OTP"}, status=400)
 
         otp.is_used = True
         otp.save()
 
         login(request, user)
+        
+        # Update the LoginLog to success
+        log = LoginLogs.objects.filter(user=user).last()
+        if log:
+            log.login_status = True
+            log.save()
 
         user_role = UserRole.objects.get(user=user)
-
-        if user_role.is_first_login:
-            return Response({
-                "message": "First login - change password required",
-                "force_change_password": True
-            })
-
-        return Response({"message": "Login successful"})
-
+        return Response({
+            "message": "Login successful",
+            "force_change_password": user_role.is_first_login
+        })
 class ForceChangePasswordView(APIView):
     # permission_classes = [IsAuthenticated]
     def post(self, request):

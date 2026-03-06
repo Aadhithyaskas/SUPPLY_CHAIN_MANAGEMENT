@@ -8,11 +8,14 @@ from .views import (
     AdminCreateUserView,
     VerifyLoginOTPView,
     ForceChangePasswordView,
-    LogoutView
+    LogoutView,DeleteUserView
 )
 
 urlpatterns = [
+    
     # 🔐 Registration
+    path('delete-user/<str:employee_id>/', DeleteUserView.as_view()),
+
     path('send-register-otp/', SendRegisterOTPView.as_view(), name='send-register-otp'),
     path('verify-register-otp/', VerifyRegisterOTPView.as_view(), name='verify-register-otp'),
     # 🔑 Login

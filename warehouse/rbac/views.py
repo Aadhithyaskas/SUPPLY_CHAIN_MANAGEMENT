@@ -34,49 +34,83 @@ class LogoutView(APIView):
             {"message": "Logged out successfully"},
             status=status.HTTP_200_OK
         )
+class DeleteUserView(APIView):
+    
+    def delete(self, request, employee_id):
+
+        try:
+            print("Employee ID received:", employee_id)
+            
+            userrole = UserRole.objects.get(employee_id=employee_id)
+            userrole.user.delete()
+
+
+            return Response(
+                {"message": f"{employee_id} deleted successfully"},
+                status=status.HTTP_200_OK
+            )
+
+        except UserRole.DoesNotExist:
+            return Response(
+                {"error": "Employee not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class AdminCreateUserView(APIView):
+    
     def post(self, request):
+
         username = request.data.get("username")
         email = request.data.get("email")
         role_name = request.data.get("role")
 
-        # 1. Validation
+        # Validation
         if not username or not email or not role_name:
             return Response({"error": "All fields required"}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(username=username).exists():
             return Response({"error": "User already exists"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check if email exists to prevent duplicates
+
         if User.objects.filter(email=email).exists():
             return Response({"error": "Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Logic
+        # Logic
         password = generate_random_password()
         role, _ = Role.objects.get_or_create(name=role_name)
 
+        last_user = User.objects.order_by('-id').first()
+        next_id = last_user.id + 1 if last_user else 1
+        custom_id = f"EMP{next_id:04d}"
+
+        # Create User
         user = User.objects.create_user(
             username=username,
             email=email,
             password=password
         )
 
-        UserRole.objects.create(user=user, role=role, is_first_login=True)
+        # Create UserRole
+        user_role = UserRole.objects.create(
+            employee_id=custom_id,
+            user=user,
+            role=role,
+            is_first_login=True
+        )
 
-        # 3. Communication
+        # Send Email
         send_mail(
             subject="Your Account Password",
-            message=f"Your login password is: {password} and your User ID is: {user.id}",
+            message=f"Your login password is: {password} and your Employee ID is: {user_role.employee_id}",
             from_email=None,
             recipient_list=[email],
         )
 
-        # 4. Corrected Response (Merged dictionaries)
+        # Response
         return Response({
             "message": "User created and password sent",
-            "id": user.id
+            "employee_id": user_role.employee_id
         }, status=status.HTTP_201_CREATED)
+
 
 class LoginView(APIView):
     # Fixed: get_client_ip must take 'self' if it's inside the class, 

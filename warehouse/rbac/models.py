@@ -39,6 +39,7 @@ class Permission(models.Model):
 
 
 class UserRole(models.Model):
+    employee_id = models.CharField(max_length=100, unique=True, primary_key=True)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     role = models.ForeignKey(Role, on_delete=models.CASCADE)
     is_first_login = models.BooleanField(default=True)   # ADD THIS

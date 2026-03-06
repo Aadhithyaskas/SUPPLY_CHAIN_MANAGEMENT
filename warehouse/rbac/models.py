@@ -3,6 +3,7 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth import get_user_model
+from django.conf import settings
 
 class Role(models.Model):
 
@@ -71,3 +72,22 @@ class OTP(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.purpose}"
+
+
+
+class LoginLogs(models.Model):
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    login_time = models.DateTimeField(auto_now_add=True)
+
+    logout_time = models.DateTimeField(null=True, blank=True)
+
+    ip_address = models.GenericIPAddressField()
+
+    device_info = models.CharField(max_length=255)
+
+    login_status = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.user} - {self.login_time}"

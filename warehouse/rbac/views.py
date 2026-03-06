@@ -5,8 +5,9 @@ from rest_framework import status
 from .models import Role, UserRole
 from django.utils import timezone
 from .models import OTP
+from django.utils.timezone import now
 # from vendors.models import Vendor
-
+from .models import LoginLogs
 from .services import send_otp_email
 from .serializers import RegisterSerializer
 from .serializers import LoginSerializer,ResetPasswordSerializer,ResetPasswordSerializer,ForgotPasswordSerializer
@@ -16,22 +17,43 @@ from django.core.mail import send_mail
 # from rest_framework.permissions import IsAuthenticated
 User = get_user_model()
 
-class AdminCreateUserView(APIView):
-    
+class LogoutView(APIView):
+
     def post(self, request):
 
+        log = LoginLogs.objects.filter(
+            user=request.user,
+            login_status=True
+        ).last()
+
+        if log:
+            log.logout_time = now()
+            log.save()
+
+        return Response(
+            {"message": "Logged out successfully"},
+            status=status.HTTP_200_OK
+        )
+
+class AdminCreateUserView(APIView):
+    def post(self, request):
         username = request.data.get("username")
         email = request.data.get("email")
         role_name = request.data.get("role")
 
+        # 1. Validation
         if not username or not email or not role_name:
-            return Response({"error": "All fields required"}, status=400)
+            return Response({"error": "All fields required"}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(username=username).exists():
-            return Response({"error": "User already exists"}, status=400)
+            return Response({"error": "User already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if email exists to prevent duplicates
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # 2. Logic
         password = generate_random_password()
-
         role, _ = Role.objects.get_or_create(name=role_name)
 
         user = User.objects.create_user(
@@ -40,130 +62,99 @@ class AdminCreateUserView(APIView):
             password=password
         )
 
-        UserRole.objects.create(user=user, role=role)
+        UserRole.objects.create(user=user, role=role, is_first_login=True)
 
+        # 3. Communication
         send_mail(
             subject="Your Account Password",
-            message=f"Your login password is: {password}",
+            message=f"Your login password is: {password} and your User ID is: {user.id}",
             from_email=None,
             recipient_list=[email],
         )
 
-        return Response({"message": "User created and password sent"})
-
-
-# class RegisterView(APIView):
-    # def post(self, request):
-    #     username = request.data.get("username")
-    #     password = request.data.get("password")
-    #     role_name = request.data.get("role")
-
-    #     if not username or not password or not role_name:
-    #         return Response(
-    #             {"error": "Username, password and role are required"},
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
-
-    #     if User.objects.filter(username=username).exists():
-    #         return Response(
-    #             {"error": "User already exists"},
-    #             status=status.HTTP_400_BAD_REQUEST
-    #         )
-
-    #     role, created = Role.objects.get_or_create(name=role_name)
-
-    #     user = User.objects.create_user(
-    #         username=username,
-    #         password=password
-    #     )
-
-    #     UserRole.objects.create(user=user, role=role)
-
-    #     return Response(
-    #         {"message": "User registered successfully"},
-    #         status=status.HTTP_201_CREATED
-    #     )
-class VerifyRegisterOTPView(APIView):
-
-    def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
-
-        data = serializer.validated_data
-
-        otp = OTP.objects.filter(
-            email=data["email"],
-            otp_code=data["otp"],
-            purpose="REGISTER",
-            is_used=False
-        ).last()
-
-        if not otp:
-            return Response({"error": "Invalid OTP"}, status=400)
-
-        if otp.is_expired():
-            return Response({"error": "OTP expired"}, status=400)
-
-        otp.is_used = True
-        otp.save()
-
-        role, _ = Role.objects.get_or_create(name=data["role"])
-
-        user = User.objects.create_user(
-            username=data["username"],
-            email=data["email"],
-            password=data["password"]
-        )
-
-        UserRole.objects.create(user=user, role=role)
-
-        # ✅ Session Login
-        login(request, user)
-
-        return Response({"message": "User registered successfully"})
+        # 4. Corrected Response (Merged dictionaries)
+        return Response({
+            "message": "User created and password sent",
+            "id": user.id
+        }, status=status.HTTP_201_CREATED)
 
 class LoginView(APIView):
-    
+    # Fixed: get_client_ip must take 'self' if it's inside the class, 
+    # OR be a staticmethod. I'll make it a staticmethod for easier access.
+    @staticmethod
+    def get_client_ip(request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
     def post(self, request):
-
         serializer = LoginSerializer(data=request.data)
-
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
-        username = serializer.validated_data["username"]
-        password = serializer.validated_data["password"]
+        # UPDATED: Getting email instead of username
+        email = serializer.validated_data.get("email")
+        password = serializer.validated_data.get("password")
+        user_id = serializer.validated_data.get("user_id")
 
-        user = authenticate(username=username, password=password)
+        # 1. Identify user by email
+        try:
+           user_obj = User.objects.get(id=user_id, email=email)
+        except User.DoesNotExist:
+           return Response({"error": "Invalid credentials"}, status=401)
+
+
+        # 2. Authenticate using the username associated with that email
+        user = authenticate(username=user_obj.username, password=password)
 
         if not user:
             return Response({"error": "Invalid credentials"}, status=401)
 
-        # 🔥 Instead of login() here, send OTP
+        # Logic remains the same: Send OTP, don't login yet
         send_otp_email(user.email, "LOGIN")
+        
+        # Fixed: Call static method using class name or self
+        ip = self.get_client_ip(request)
+        device = request.META.get('HTTP_USER_AGENT')
+
+        # Log the login attempt
+        LoginLogs.objects.create(
+            user=user,
+            ip_address=ip,
+            device_info=device,
+            login_status=False # Should be False until OTP is verified
+        )
 
         return Response({
-            "message": "OTP sent",
-            "username": username
-        })
+             "message": "OTP sent",
+             "email": email,
+             "user_id": user.id
+})
 
 class VerifyLoginOTPView(APIView):
     
     def post(self, request):
 
-        username = request.data.get("username")
+        user_id = request.data.get("user_id")
         otp_code = request.data.get("otp")
 
-        user = User.objects.get(username=username)
+        if not user_id or not otp_code:
+            return Response({"error": "user_id and otp required"}, status=400)
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
 
         otp = OTP.objects.filter(
             email=user.email,
             otp_code=otp_code,
             purpose="LOGIN",
             is_used=False
-        ).last()
+        ).order_by("-created_at").first()
 
         if not otp:
             return Response({"error": "Invalid OTP"}, status=400)
@@ -176,16 +167,24 @@ class VerifyLoginOTPView(APIView):
 
         login(request, user)
 
+        # Update login log
+        log = LoginLogs.objects.filter(
+    user=user,
+    login_status=False
+).last()
+
+
+        if log:
+            log.login_status = True
+            log.save()
+
         user_role = UserRole.objects.get(user=user)
 
-        if user_role.is_first_login:
-            return Response({
-                "message": "First login - change password required",
-                "force_change_password": True
-            })
-
-        return Response({"message": "Login successful"})
-
+        return Response({
+            "message": "Login successful",
+            "force_change_password": user_role.is_first_login
+        })
+        
 class ForceChangePasswordView(APIView):
     # permission_classes = [IsAuthenticated]
     def post(self, request):

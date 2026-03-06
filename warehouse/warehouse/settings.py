@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+
 
 # settings.py
 from datetime import timedelta
@@ -9,6 +12,11 @@ from datetime import timedelta
 #         'rest_framework_simplejwt.authentication.JWTAuthentication',
 #     ),
 # }
+
+load_dotenv()
+#admin credentials from .env
+FOUNDER_ADMIN_ID = os.getenv("FOUNDER_ADMIN_ID")
+FOUNDER_ADMIN_PASSWORD = os.getenv("FOUNDER_ADMIN_PASSWORD")
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -35,7 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'vendors',
-    'suppliers2',
+    'supplier',
 
     # Third Party
     # 'rest_framework',

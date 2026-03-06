@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model, authenticate
-from rest_framework.views import APIView
+from rest_framework.views import APIView, settings
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Role, UserRole
@@ -16,6 +16,28 @@ from .services import generate_random_password
 from django.core.mail import send_mail
 # from rest_framework.permissions import IsAuthenticated
 User = get_user_model()
+
+
+class FounderAdminLoginView(APIView):
+
+    def post(self, request):
+
+        admin_id = request.data.get("admin_id")
+        password = request.data.get("password")
+
+        if (
+            admin_id == settings.FOUNDER_ADMIN_ID and
+            password == settings.FOUNDER_ADMIN_PASSWORD
+        ):
+            return Response(
+                {"message": "Admin login successful"},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            {"error": "Invalid Admin credentials"},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
 class LogoutView(APIView):
 
@@ -65,6 +87,11 @@ class AdminCreateUserView(APIView):
         role_name = request.data.get("role")
 
         # Validation
+        if role_name not in [("inventory_manager", "Inventory Manager"),("quality_assistant", "Quality Assistant"),("admin", "Admin"),("manager", "Manager"),("supervisor","Supervisor")]:
+            return Response({"error":"Invalid role selected"})
+
+            
+
         if not username or not email or not role_name:
             return Response({"error": "All fields required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -73,6 +100,16 @@ class AdminCreateUserView(APIView):
 
         if User.objects.filter(email=email).exists():
             return Response({"error": "Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        # 🚫 Prevent creating another admin
+        if role_name.lower() == "admin":
+            if UserRole.objects.filter(role__name="admin").exists():
+                return Response(
+                    {"error": "Admin already exists. Cannot create another Admin."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
 
         # Logic
         password = generate_random_password()
@@ -105,7 +142,6 @@ class AdminCreateUserView(APIView):
             recipient_list=[email],
         )
 
-        # Response
         return Response({
             "message": "User created and password sent",
             "employee_id": user_role.employee_id

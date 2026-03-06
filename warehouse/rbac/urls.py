@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    FounderAdminLoginView,
     SendRegisterOTPView,
     VerifyRegisterOTPView,
     LoginView,
@@ -27,5 +28,6 @@ urlpatterns = [
     path('verify-login-otp/', VerifyLoginOTPView.as_view(), name='verify-login-otp'),
     path('force-change-password/', ForceChangePasswordView.as_view(), name='force-change-password'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path("founder-login/", FounderAdminLoginView.as_view(), name="founder-login"),
 
 ]

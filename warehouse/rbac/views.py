@@ -329,54 +329,7 @@ class ForceChangePasswordView(APIView):
         return Response({"message": "Password changed successfully"})
 
 
-class SendRegisterOTPView(APIView):
 
-    def post(self, request):
-        email = request.data.get("email")
-
-        if not email:
-            return Response({"error": "Email required"}, status=400)
-
-        send_otp_email(email, "REGISTER")
-        return Response({"message": "OTP sent"})
-
-
-class VerifyRegisterOTPView(APIView):
-
-    def post(self, request):
-        email = request.data.get("email")
-        otp_code = request.data.get("otp")
-        username = request.data.get("username")
-        password = request.data.get("password")
-        role_name = request.data.get("role")
-
-        otp = OTP.objects.filter(
-            email=email,
-            otp_code=otp_code,
-            purpose="REGISTER",
-            is_used=False
-        ).last()
-
-        if not otp:
-            return Response({"error": "Invalid OTP"}, status=400)
-
-        if otp.is_expired():
-            return Response({"error": "OTP expired"}, status=400)
-
-        otp.is_used = True
-        otp.save()
-
-        role, _ = Role.objects.get_or_create(name=role_name)
-
-        user = User.objects.create_user(
-            username=username,
-            password=password,
-            email=email
-        )
-
-        UserRole.objects.create(user=user, role=role)
-
-        return Response({"message": "User registered successfully"})
 
 class ForgotPasswordOTPView(APIView):
 

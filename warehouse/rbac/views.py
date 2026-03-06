@@ -56,27 +56,78 @@ class LogoutView(APIView):
             {"message": "Logged out successfully"},
             status=status.HTTP_200_OK
         )
+        
+class ListEmployeeView(APIView):
+    def get(self, request):
+        # Fetch UserRoles to get access to both User and Employee ID
+        # select_related avoids the "N+1" database query problem
+        employees = UserRole.objects.select_related('user', 'role').all()
+        
+        data = []
+        for emp in employees:
+            data.append({
+                "id": emp.user.id,
+                "employee_id": emp.employee_id,
+                "username": emp.user.username,
+                "email": emp.user.email,
+                "role": emp.role.name,
+                "is_first_login": emp.is_first_login
+            })
+
+        return Response(data, status=status.HTTP_200_OK)
+class UpdateEmployeeView(APIView):
+    def put(self, request, employee_id):
+        try:
+            # 1. Find the UserRole object
+            user_role = UserRole.objects.select_related('user').get(employee_id=employee_id)
+            user = user_role.user
+            
+            # 2. Extract data from request
+            new_username = request.data.get("username", user.username)
+            new_email = request.data.get("email", user.email)
+            new_role_name = request.data.get("role")
+
+            # 3. Update User model fields
+            user.username = new_username
+            user.email = new_email
+            user.save()
+
+            # 4. Update Role if provided
+            if new_role_name:
+                role_obj, _ = Role.objects.get_or_create(name=new_role_name)
+                user_role.role = role_obj
+                user_role.save()
+
+            return Response({
+                "message": f"Employee {employee_id} updated successfully",
+                "employee_id": employee_id
+            }, status=status.HTTP_200_OK)
+
+        except UserRole.DoesNotExist:
+            return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+        
 class DeleteUserView(APIView):
     
     def delete(self, request, employee_id):
 
         try:
-            print("Employee ID received:", employee_id)
-            
             userrole = UserRole.objects.get(employee_id=employee_id)
-            userrole.user.delete()
+            user = userrole.user
 
+            user.delete()
 
             return Response(
-                {"message": f"{employee_id} deleted successfully"},
-                status=status.HTTP_200_OK
+                {"message": "User deleted successfully"},
+                status=200
             )
 
         except UserRole.DoesNotExist:
             return Response(
                 {"error": "Employee not found"},
-                status=status.HTTP_404_NOT_FOUND
+                status=404
             )
+
+
 
 class AdminCreateUserView(APIView):
     

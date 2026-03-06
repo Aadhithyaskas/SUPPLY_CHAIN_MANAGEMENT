@@ -9,18 +9,23 @@ from .views import (
     AdminCreateUserView,
     VerifyLoginOTPView,
     ForceChangePasswordView,
-    LogoutView,DeleteUserView
+    LogoutView,DeleteUserView,ListEmployeeView,UpdateEmployeeView
 )
 
 urlpatterns = [
     
+    #admin login
+    path("founder-login/", FounderAdminLoginView.as_view(), name="founder-login"),
+
     # 🔐 Registration
     path('delete-user/<str:employee_id>/', DeleteUserView.as_view()),
 
     path('send-register-otp/', SendRegisterOTPView.as_view(), name='send-register-otp'),
     path('verify-register-otp/', VerifyRegisterOTPView.as_view(), name='verify-register-otp'),
+    
     # 🔑 Login
     path('login/', LoginView.as_view(), name='login'),
+
     # 🔁 Forgot Password
     path('forgot-password-otp/', ForgotPasswordOTPView.as_view(), name='forgot-password-otp'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
@@ -28,6 +33,5 @@ urlpatterns = [
     path('verify-login-otp/', VerifyLoginOTPView.as_view(), name='verify-login-otp'),
     path('force-change-password/', ForceChangePasswordView.as_view(), name='force-change-password'),
     path('logout/', LogoutView.as_view(), name='logout'),
-    path("founder-login/", FounderAdminLoginView.as_view(), name="founder-login"),
 
 ]

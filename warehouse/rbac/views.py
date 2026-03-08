@@ -18,26 +18,6 @@ from django.core.mail import send_mail
 User = get_user_model()
 
 
-class FounderAdminLoginView(APIView):
-
-    def post(self, request):
-
-        admin_id = request.data.get("admin_id")
-        password = request.data.get("password")
-
-        if (
-            admin_id == settings.FOUNDER_ADMIN_ID and
-            password == settings.FOUNDER_ADMIN_PASSWORD
-        ):
-            return Response(
-                {"message": "Admin login successful"},
-                status=status.HTTP_200_OK
-            )
-
-        return Response(
-            {"error": "Invalid Admin credentials"},
-            status=status.HTTP_401_UNAUTHORIZED
-        )
 
 class LogoutView(APIView):
 
@@ -75,6 +55,7 @@ class ListEmployeeView(APIView):
             })
 
         return Response(data, status=status.HTTP_200_OK)
+
 class UpdateEmployeeView(APIView):
     def put(self, request, employee_id):
         try:
@@ -136,10 +117,12 @@ class AdminCreateUserView(APIView):
         username = request.data.get("username")
         email = request.data.get("email")
         role_name = request.data.get("role")
+        firstname=request.data.get("f_name")
+        lastname=request.data.get("l_name")
 
         # Validation
-        if role_name not in [("inventory_manager", "Inventory Manager"),("quality_assistant", "Quality Assistant"),("admin", "Admin"),("manager", "Manager"),("supervisor","Supervisor")]:
-            return Response({"error":"Invalid role selected"})
+        # if role_name not in [("inventory_manager", "Inventory Manager"),("quality_assistant", "Quality Assistant"),("admin", "Admin"),("manager", "Manager"),("supervisor","Supervisor")]:
+        #     return Response({"error":"Invalid role selected"})
 
             
 
@@ -172,10 +155,13 @@ class AdminCreateUserView(APIView):
 
         # Create User
         user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password
-        )
+                     username=username,
+                     first_name=firstname,
+                     last_name=lastname,
+                     email=email,
+                     password=password
+)
+
 
         # Create UserRole
         user_role = UserRole.objects.create(
@@ -200,8 +186,7 @@ class AdminCreateUserView(APIView):
 
 
 class LoginView(APIView):
-    # Fixed: get_client_ip must take 'self' if it's inside the class, 
-    # OR be a staticmethod. I'll make it a staticmethod for easier access.
+
     @staticmethod
     def get_client_ip(request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -212,48 +197,52 @@ class LoginView(APIView):
         return ip
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
 
-        # UPDATED: Getting email instead of username
-        email = serializer.validated_data.get("email")
-        password = serializer.validated_data.get("password")
-        user_id = serializer.validated_data.get("user_id")
+        email = request.data.get("email")
+        password = request.data.get("password")
+        user_id = request.data.get("user_id")
 
-        # 1. Identify user by email
+        # -------------------
+        # Founder Admin Login
+        # -------------------
+        if email == settings.FOUNDER_ADMIN_EMAIL and password == settings.FOUNDER_ADMIN_PASSWORD:
+            return Response({
+                "message": "Founder Admin login successful",
+                "role": "FOUNDER_ADMIN"
+            }, status=200)
+
+        # -------------------
+        # Normal User Login
+        # -------------------
         try:
-           user_obj = User.objects.get(id=user_id, email=email)
+            user_obj = User.objects.get(id=user_id, email=email)
         except User.DoesNotExist:
-           return Response({"error": "Invalid credentials"}, status=401)
+            return Response({"error": "Invalid credentials"}, status=401)
 
-
-        # 2. Authenticate using the username associated with that email
         user = authenticate(username=user_obj.username, password=password)
 
         if not user:
             return Response({"error": "Invalid credentials"}, status=401)
 
-        # Logic remains the same: Send OTP, don't login yet
         send_otp_email(user.email, "LOGIN")
-        
-        # Fixed: Call static method using class name or self
+
         ip = self.get_client_ip(request)
         device = request.META.get('HTTP_USER_AGENT')
 
-        # Log the login attempt
         LoginLogs.objects.create(
             user=user,
             ip_address=ip,
             device_info=device,
-            login_status=False # Should be False until OTP is verified
+            login_status=False
         )
 
         return Response({
-             "message": "OTP sent",
-             "email": email,
-             "user_id": user.id
-})
+            "message": "OTP sent",
+            "email": email,
+            "user_id": user.id,
+            "role": "USER"
+        })
+
 
 class VerifyLoginOTPView(APIView):
     

@@ -17,12 +17,13 @@ load_dotenv()
 #admin credentials from .env
 FOUNDER_ADMIN_ID = os.getenv("FOUNDER_ADMIN_ID")
 FOUNDER_ADMIN_PASSWORD = os.getenv("FOUNDER_ADMIN_PASSWORD")
-
+EMP_ID=os.getenv("EMP")
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ]
 }
+
 
 
 
@@ -59,7 +60,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -107,6 +108,9 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -133,3 +137,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 #         'rest_framework.authentication.SessionAuthentication',
 #     ],
 # }
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000"
+]

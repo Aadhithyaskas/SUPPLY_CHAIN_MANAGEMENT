@@ -15,9 +15,13 @@ from django.contrib.auth import authenticate, login
 from .services import generate_random_password
 from django.core.mail import send_mail
 # from rest_framework.permissions import IsAuthenticated
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.http import JsonResponse
 User = get_user_model()
 
-
+@ensure_csrf_cookie
+def get_csrf_token(request):
+    return JsonResponse({"message": "CSRF cookie set"})
 
 class LogoutView(APIView):
 
@@ -198,28 +202,32 @@ class LoginView(APIView):
 
     def post(self, request):
 
+        employee_id = request.data.get("employee_id")
         email = request.data.get("email")
         password = request.data.get("password")
-        user_id = request.data.get("user_id")
 
         # -------------------
         # Founder Admin Login
         # -------------------
-        if email == settings.FOUNDER_ADMIN_EMAIL and password == settings.FOUNDER_ADMIN_PASSWORD:
+        if email == settings.EMP_ID and password == settings.FOUNDER_ADMIN_PASSWORD and employee_id==settings.FOUNDER_ADMIN_ID:
             return Response({
                 "message": "Founder Admin login successful",
                 "role": "FOUNDER_ADMIN"
             }, status=200)
 
         # -------------------
-        # Normal User Login
+        # Employee Login
         # -------------------
-        try:
-            user_obj = User.objects.get(id=user_id, email=email)
-        except User.DoesNotExist:
-            return Response({"error": "Invalid credentials"}, status=401)
+        if not employee_id or not password:
+            return Response({"error": "employee_id and password required"}, status=400)
 
-        user = authenticate(username=user_obj.username, password=password)
+        try:
+            user_role = UserRole.objects.select_related('user').get(employee_id=employee_id)
+            user = user_role.user
+        except UserRole.DoesNotExist:
+            return Response({"error": "Invalid employee ID"}, status=401)
+
+        user = authenticate(username=user.username, password=password)
 
         if not user:
             return Response({"error": "Invalid credentials"}, status=401)
@@ -238,26 +246,27 @@ class LoginView(APIView):
 
         return Response({
             "message": "OTP sent",
-            "email": email,
-            "user_id": user.id,
-            "role": "USER"
+            "employee_id": employee_id,
+            "email": user.email,
+            "role": user_role.role.name
         })
 
 
 class VerifyLoginOTPView(APIView):
-    
+
     def post(self, request):
 
-        user_id = request.data.get("user_id")
+        employee_id = request.data.get("employee_id")
         otp_code = request.data.get("otp")
 
-        if not user_id or not otp_code:
-            return Response({"error": "user_id and otp required"}, status=400)
+        if not employee_id or not otp_code:
+            return Response({"error": "employee_id and otp required"}, status=400)
 
         try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({"error": "User not found"}, status=404)
+            user_role = UserRole.objects.select_related('user').get(employee_id=employee_id)
+            user = user_role.user
+        except UserRole.DoesNotExist:
+            return Response({"error": "Employee not found"}, status=404)
 
         otp = OTP.objects.filter(
             email=user.email,
@@ -279,16 +288,13 @@ class VerifyLoginOTPView(APIView):
 
         # Update login log
         log = LoginLogs.objects.filter(
-    user=user,
-    login_status=False
-).last()
-
+            user=user,
+            login_status=False
+        ).last()
 
         if log:
             log.login_status = True
             log.save()
-
-        user_role = UserRole.objects.get(user=user)
 
         return Response({
             "message": "Login successful",

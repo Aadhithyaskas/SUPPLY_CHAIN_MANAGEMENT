@@ -7,7 +7,7 @@ from .views import (
     AdminCreateUserView,
     VerifyLoginOTPView,
     ForceChangePasswordView,
-    LogoutView,DeleteUserView,ListEmployeeView,UpdateEmployeeView
+    LogoutView,DeleteUserView,ListEmployeeView,UpdateEmployeeView,get_csrf_token
 )
 
 urlpatterns = [
@@ -24,5 +24,8 @@ urlpatterns = [
     path('verify-login-otp/', VerifyLoginOTPView.as_view(), name='verify-login-otp'),
     path('force-change-password/', ForceChangePasswordView.as_view(), name='force-change-password'),
     path('logout/', LogoutView.as_view(), name='logout'),
-    path('list_employees',ListEmployeeView.as_view(),name="employees"),
+    path('list_employees/',ListEmployeeView.as_view(),name="employees"),
+    path('update-user/<str:employee_id>/', UpdateEmployeeView.as_view(), name='update-user'),
+    path("csrf/", get_csrf_token),
+
 ]

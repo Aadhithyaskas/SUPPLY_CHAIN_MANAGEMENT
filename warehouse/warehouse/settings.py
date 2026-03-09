@@ -110,7 +110,9 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    "http://192.168.1.10:3000"
 ]
+
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -137,6 +139,8 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 #         'rest_framework.authentication.SessionAuthentication',
 #     ],
 # }
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", "192.168.1.10"]
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000"

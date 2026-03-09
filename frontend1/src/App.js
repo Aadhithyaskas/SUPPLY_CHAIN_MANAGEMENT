@@ -1,24 +1,33 @@
-import logo from './logo.svg';
+import React, { useEffect } from 'react';
+import { AuthProvider } from './context/AuthContext';
+import { WarehouseProvider } from './context/WarehouseContext';
+import AppRouter from './routes/AppRouter';
+import { ensureCSRF } from './services/api';
 import './App.css';
 
 function App() {
+  useEffect(() => {
+    // Initialize CSRF token
+    const initCSRF = async () => {
+      try {
+        await ensureCSRF();
+        console.log('CSRF token initialized');
+      } catch (error) {
+        console.error('Failed to initialize CSRF:', error);
+      }
+    };
+    
+    initCSRF();
+  }, []);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <AuthProvider>
+      <WarehouseProvider>
+        <div className="App">
+          <AppRouter />
+        </div>
+      </WarehouseProvider>
+    </AuthProvider>
   );
 }
 

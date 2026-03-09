@@ -6,23 +6,23 @@ from .models import Supplier
 class SupplierAdmin(admin.ModelAdmin):
 
     list_display = (
+        "supplier_id",
         "supplier_name",
-        "contact_personname",
         "email",
         "phone",
         "city",
-        "country",
         "is_active",
+        "created_at"
     )
 
     search_fields = (
         "supplier_name",
-        "email",
-        "phone",
+        "supplier_id",
+        "email"
     )
 
     list_filter = (
         "city",
-        "country",
-        "is_active",
+        "state",
+        "is_active"
     )

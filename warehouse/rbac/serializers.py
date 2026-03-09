@@ -18,7 +18,7 @@ class RegisterSerializer(serializers.Serializer):
     otp = serializers.CharField()
 
 class LoginSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField()
+    user_id = serializers.CharField()
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 

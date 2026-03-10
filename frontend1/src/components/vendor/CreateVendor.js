@@ -13,9 +13,13 @@ const CreateVendor = () => {
   const [formData, setFormData] = useState({
     vendor_name: '',
     email: '',
+    contact_person:'',
     lead_time: '',
     address: '',
-    phone: ''
+    phone: '',
+    city:'',
+    state:'',
+    country:''
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -79,11 +83,53 @@ const CreateVendor = () => {
         <Input
           label="Vendor Name"
           name="vendor_name"
+          type="text"
           value={formData.vendor_name}
           onChange={handleChange}
           error={errors.vendor_name}
           touched={true}
           required
+        />
+          <Input
+          label="Contact Person"
+          name="contact_person"
+          type="text"
+          value={formData.contact_person}
+          onChange={handleChange}
+          error={errors.contact_person}
+         
+          placeholder="Enter contact person"
+        />
+
+         <Input
+          label="City"
+          name="city"
+          type="text"
+          value={formData.city}
+          onChange={handleChange}
+          error={errors.city}
+          touched={true}
+          placeholder="Enter city"
+        />
+         <Input
+          label="Country"
+          type="text"
+          name="country"
+          value={formData.country}
+          onChange={handleChange}
+          error={errors.country}
+          touched={true}
+          placeholder="Enter country"
+        />
+         <Input
+          label="State"
+          type="text"
+          name="state"
+          value={formData.state}
+          onChange={handleChange}
+          error={errors.state}
+          touched={true}
+          placeholder="Enter state"
         />
 
         <Input
@@ -126,6 +172,7 @@ const CreateVendor = () => {
           touched={true}
           placeholder="Enter vendor address"
         />
+
 
         <Button
           type="submit"

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 // Layout
 import Layout from '../components/Layout';
-import DeleteEmployee from '../components/admin/DeleteEmployee';
+
 // Auth Components
 import Login from '../components/auth/Login';
 import OTPVerification from '../components/auth/OTPVerification';
@@ -35,10 +35,10 @@ import DeleteSupplier from '../components/supplier/DeleteSupplier';
 
 // Admin Components
 import AdminCreateUser from '../components/admin/AdminCreateUser';
-// import AdminDashboard from '../components/admin/AdminDashboard';
 import ListEmployees from '../components/admin/ListEmployees';
 import UpdateEmployee from '../components/admin/UpdateEmployee';
-
+import DeleteEmployee from '../components/admin/DeleteEmployee';
+import LoginSuccess from '../components/auth/LoginSuccess';
 // Routes
 import PrivateRoute from './PrivateRoute';
 import AdminRoute from './AdminRoute';
@@ -138,29 +138,32 @@ const AppRouter = () => {
 
           {/* ===== ADMIN ROUTES ===== */}
           <Route path="admin">
-            <Route index element={
-              <AdminRoute>
-                <AdminDashboard />
-              </AdminRoute>
-            } />
-            <Route path="dashboard" element={
-              <AdminRoute>
-                <AdminDashboard />
-              </AdminRoute>
-            } />
+            {/* Redirect /admin to /admin/employees */}
+            <Route index element={<Navigate to="/admin/employees" />} />
+            
             <Route path="create-user" element={
               <AdminRoute>
                 <AdminCreateUser />
               </AdminRoute>
             } />
+            
             <Route path="employees" element={
               <AdminRoute>
                 <ListEmployees />
               </AdminRoute>
             } />
+
+          
+            
             <Route path="update-employee/:employeeId" element={
               <AdminRoute>
                 <UpdateEmployee />
+              </AdminRoute>
+            } />
+            
+            <Route path="delete-employee/:employeeId" element={
+              <AdminRoute>
+                <DeleteEmployee />
               </AdminRoute>
             } />
           </Route>
@@ -168,48 +171,14 @@ const AppRouter = () => {
 
         {/* ===== 404 - NOT FOUND ===== */}
         <Route path="*" element={<Navigate to="/dashboard" />} />
+          <Route path="/login-success" element={
+  <PrivateRoute>
+    <LoginSuccess />
+  </PrivateRoute>
+} />
       </Routes>
     </BrowserRouter>
   );
 };
-// Add these imports
-
-
-
-// Add these routes inside your admin section
-<Route path="admin">
-  <Route index element={
-    <AdminRoute>
-      <AdminDashboard />
-    </AdminRoute>
-  } />
-  <Route path="dashboard" element={
-    <AdminRoute>
-      <AdminDashboard />
-    </AdminRoute>
-  } />
-  <Route path="create-user" element={
-    <AdminRoute>
-      <AdminCreateUser />
-    </AdminRoute>
-  } />
-  <Route path="employees" element={
-    <AdminRoute>
-      <ListEmployees />
-    </AdminRoute>
-  } />
-  
-  {/* Update and Delete routes */}
-  <Route path="update-employee/:employeeId" element={
-    <AdminRoute>
-      <UpdateEmployee />
-    </AdminRoute>
-  } />
-  <Route path="delete-employee/:employeeId" element={
-    <AdminRoute>
-      <DeleteEmployee />
-    </AdminRoute>
-  } />
-</Route>
 
 export default AppRouter;

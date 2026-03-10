@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 const useOTPTimer = (initialTime = 60) => {
   const [timeLeft, setTimeLeft] = useState(initialTime);
@@ -6,25 +6,26 @@ const useOTPTimer = (initialTime = 60) => {
   const [canResend, setCanResend] = useState(false);
   const timerRef = useRef(null);
 
-  const startTimer = () => {
-    setIsActive(true);
-    setCanResend(false);
-    setTimeLeft(initialTime);
-  };
-
-  const stopTimer = () => {
+  const stopTimer = useCallback(() => {
     setIsActive(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  };
+  }, []);
 
-  const resetTimer = () => {
+  const startTimer = useCallback(() => {
+    stopTimer();
+    setIsActive(true);
+    setCanResend(false);
+    setTimeLeft(initialTime);
+  }, [initialTime, stopTimer]);
+
+  const resetTimer = useCallback(() => {
     stopTimer();
     setTimeLeft(initialTime);
     setCanResend(true);
-  };
+  }, [initialTime, stopTimer]);
 
   useEffect(() => {
     if (isActive && timeLeft > 0) {
@@ -45,7 +46,7 @@ const useOTPTimer = (initialTime = 60) => {
         clearInterval(timerRef.current);
       }
     };
-  }, [isActive, timeLeft]);
+  }, [isActive, timeLeft, stopTimer]);
 
   // Format time as MM:SS
   const formattedTime = () => {

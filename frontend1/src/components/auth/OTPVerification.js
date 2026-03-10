@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../common/Card';
@@ -10,16 +10,23 @@ import { ALERT_TYPES, OTP_LENGTH } from '../../utils/constants';
 
 const OTPVerification = () => {
   const navigate = useNavigate();
-  const { verifyOTPAndLogin, tempUserData, isAuthenticated } = useAuth();
+  const { verifyOTPAndLogin, tempUserData, isAuthenticatedacha } = useAuth();
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const { timeLeft, isActive, canResend, startTimer } = useOTPTimer(60);
+  const { timeLeft, formattedTime, isActive, canResend, startTimer } = useOTPTimer(60);
+
+  const handleResendOTP = useCallback(() => {
+    // Implement resend OTP logic here
+    startTimer();
+    setOtp('');
+    setSuccessMessage('New OTP sent to your email');
+  }, [startTimer]);
 
   useEffect(() => {
     startTimer();
-  }, []);
+  }, [startTimer]);
 
   useEffect(() => {
     if (!tempUserData) {
@@ -71,13 +78,6 @@ const OTPVerification = () => {
     }
   };
 
-  const handleResendOTP = () => {
-    // Implement resend OTP logic here
-    startTimer();
-    setOtp('');
-    setSuccessMessage('New OTP sent to your email');
-  };
-
   return (
     <Card title="Verify OTP">
       <p style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -114,7 +114,7 @@ const OTPVerification = () => {
         <div style={{ textAlign: 'center', marginBottom: '15px' }}>
           {isActive ? (
             <span style={{ color: '#666' }}>
-              Resend OTP in {timeLeft} seconds
+              Resend OTP in {formattedTime}
             </span>
           ) : (
             <Button

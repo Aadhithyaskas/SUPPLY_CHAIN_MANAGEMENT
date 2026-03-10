@@ -65,3 +65,42 @@ export const validateWarehouseForm = (values) => {
   
   return errors;
 };
+// Add to existing validators.js
+
+export const validateEmployeeForm = (values) => {
+  const errors = {};
+  
+  if (!values.username || values.username.trim() === '') {
+    errors.username = 'Username is required';
+  } else if (values.username.length < 3) {
+    errors.username = 'Username must be at least 3 characters';
+  }
+  
+  if (!values.f_name || values.f_name.trim() === '') {
+    errors.f_name = 'First name is required';
+  }
+  
+  if (!values.l_name || values.l_name.trim() === '') {
+    errors.l_name = 'Last name is required';
+  }
+  
+  if (!values.email || values.email.trim() === '') {
+    errors.email = 'Email is required';
+  } else if (!validateEmail(values.email)) {
+    errors.email = 'Invalid email format';
+  }
+  
+  if (!values.role || values.role === '') {
+    errors.role = 'Role is required';
+  }
+  
+  return errors;
+};
+
+export const ROLES = [
+  { value: 'inventory_manager', label: 'Inventory Manager' },
+  { value: 'quality_assistant', label: 'Quality Assistant' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'supervisor', label: 'Supervisor' },
+  { value: 'admin', label: 'Admin' }
+];

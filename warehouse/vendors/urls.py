@@ -4,6 +4,7 @@ from .views import *
 urlpatterns = [
 
     # Warehouse
+    path("warehouse/", GetWarehouse.as_view()),
     path("Warehouse/create/", CreateWarehouse.as_view()),
     path("Warehouse/update/", UpdateWarehouse.as_view()),
 

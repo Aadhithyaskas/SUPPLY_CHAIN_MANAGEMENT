@@ -3,7 +3,6 @@ import {
   login as apiLogin,
   verifyOTP,
   logout as apiLogout,
-  refreshToken,
 } from "../services/authService";
 
 import {
@@ -12,17 +11,18 @@ import {
   removeUserData,
 } from "../utils/helpers";
 
-import { ROLES, STORAGE_KEYS } from "../utils/constants";
+import { ROLES } from "../utils/constants";
 
 const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error("useAuth must be used inside AuthProvider");
   }
-  return context;
 
+  return context;
 };
 
 export const AuthProvider = ({ children }) => {
@@ -36,42 +36,49 @@ export const AuthProvider = ({ children }) => {
   const [loginSuccessMessage, setLoginSuccessMessage] = useState("");
   const [showLoginMessage, setShowLoginMessage] = useState(false);
 
-  // ---------------------------
-  // INITIAL SESSION RESTORE
-  // ---------------------------
-useEffect(() => {
+  /* -----------------------------
+     Restore session on refresh
+  ------------------------------*/
+  useEffect(() => {
 
-  const initializeAuth = async () => {
+    const initializeAuth = () => {
 
-    console.log("Auth initialization started");
+      console.log("Auth initialization started");
 
-    const storedUser = getUserData();
+      const storedUser = getUserData();
 
-    console.log("Stored user:", storedUser);
+      console.log("Stored user:", storedUser);
 
-    if (storedUser) {
-      console.log("Restoring session");
+      if (storedUser) {
 
-      setUser(storedUser);
-      setIsAuthenticated(true);
-      setIsAdmin(storedUser.role === "admin");
+        setUser(storedUser);
+        setIsAuthenticated(true);
 
-    } else {
-      console.log("No stored session");
-    }
+        const adminStatus =
+          storedUser.role === ROLES.ADMIN ||
+          storedUser.role === ROLES.FOUNDER_ADMIN;
 
-    setLoading(false);
+        setIsAdmin(adminStatus);
 
-  };
+      } else {
 
-  initializeAuth();
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsAdmin(false);
 
-}, []);
+      }
 
-  // ---------------------------
-  // LOGIN
-  // ---------------------------
+      setLoading(false);
 
+    };
+
+    initializeAuth();
+
+  }, []);
+
+  /* -----------------------------
+     LOGIN
+  ------------------------------*/
   const login = async (credentials) => {
 
     try {
@@ -82,7 +89,7 @@ useEffect(() => {
         credentials.password
       );
 
-      // Founder admin login
+      /* Founder Admin login */
       if (response.message === "Founder Admin login successful") {
 
         const userData = {
@@ -92,28 +99,16 @@ useEffect(() => {
           lastLogin: new Date().toISOString(),
         };
 
-        if (response.access_token) {
-          localStorage.setItem(
-            STORAGE_KEYS.ACCESS_TOKEN,
-            response.access_token
-          );
-        }
-
-        if (response.refresh_token) {
-          localStorage.setItem(
-            STORAGE_KEYS.REFRESH_TOKEN,
-            response.refresh_token
-          );
-        }
-
         const storedUser = getUserData();
 
         if (storedUser) {
+
           setLoginSuccessMessage(
             `Welcome back! Your last login was on ${new Date(
               storedUser.lastLogin
             ).toLocaleString()}`
           );
+
           setShowLoginMessage(true);
         }
 
@@ -123,13 +118,11 @@ useEffect(() => {
 
         setUserData(userData);
 
-        return {
-          success: true,
-          isFounderAdmin: true,
-        };
+        return { success: true, isFounderAdmin: true };
+
       }
 
-      // Normal employee login → OTP required
+      /* Normal employee login → OTP required */
       setTempUserData({
         employeeId: response.employee_id,
         email: response.email,
@@ -139,42 +132,31 @@ useEffect(() => {
       return { success: true, requiresOTP: true };
 
     } catch (error) {
+
       return { success: false, error: error.message };
+
     }
   };
 
-  // ---------------------------
-  // OTP LOGIN
-  // ---------------------------
-
+  /* -----------------------------
+     OTP Verification
+  ------------------------------*/
   const verifyOTPAndLogin = async (otp) => {
 
     try {
 
       const response = await verifyOTP(tempUserData.employeeId, otp);
 
-      if (response.access_token) {
-        localStorage.setItem(
-          STORAGE_KEYS.ACCESS_TOKEN,
-          response.access_token
-        );
-      }
-
-      if (response.refresh_token) {
-        localStorage.setItem(
-          STORAGE_KEYS.REFRESH_TOKEN,
-          response.refresh_token
-        );
-      }
-
       const storedUser = getUserData();
 
       if (storedUser) {
+
         setLoginSuccessMessage(
           `Welcome back! Your last login was on ${new Date(
             storedUser.lastLogin
           ).toLocaleString()}`
         );
+
         setShowLoginMessage(true);
       }
 
@@ -189,6 +171,7 @@ useEffect(() => {
       setIsAdmin(tempUserData.role === ROLES.ADMIN);
 
       setUserData(userData);
+
       setTempUserData(null);
 
       return {
@@ -197,20 +180,21 @@ useEffect(() => {
       };
 
     } catch (error) {
+
       return { success: false, error: error.message };
+
     }
   };
 
-  // ---------------------------
-  // LOGOUT
-  // ---------------------------
-
+  /* -----------------------------
+     LOGOUT
+  ------------------------------*/
   const handleLogout = async () => {
 
     try {
       await apiLogout();
-    } catch (err) {
-      console.log("Logout error", err);
+    } catch (error) {
+      console.log("Logout error:", error);
     }
 
     setUser(null);
@@ -220,16 +204,17 @@ useEffect(() => {
 
     removeUserData();
 
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   };
 
   const dismissLoginMessage = () => {
+
     setShowLoginMessage(false);
     setLoginSuccessMessage("");
+
   };
 
   const value = {
+
     user,
     isAuthenticated,
     isAdmin,
@@ -237,10 +222,12 @@ useEffect(() => {
     tempUserData,
     loginSuccessMessage,
     showLoginMessage,
+
     login,
     verifyOTPAndLogin,
     logout: handleLogout,
     dismissLoginMessage,
+
   };
 
   return (

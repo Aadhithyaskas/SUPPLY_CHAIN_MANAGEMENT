@@ -115,6 +115,38 @@ const CreateSupplier = () => {
           placeholder="Enter supplier address"
         />
 
+        <Input
+          label="city"
+          name="city"
+          value={formData.city}
+          onChange={handleChange}
+          error={errors.city}
+          touched={true}
+          placeholder="Enter supplier city"
+        />
+
+        <Input
+          label="state"
+          name="state"
+          value={formData.state}
+          onChange={handleChange}
+          error={errors.state}
+          touched={true}
+          placeholder="Enter supplier state"
+        />
+
+        <Input
+          label="country"
+          name="country"
+          value={formData.country}
+          onChange={handleChange}
+          error={errors.country}
+          touched={true}
+          placeholder="Enter supplier country"
+        />
+
+
+
         <Button
           type="submit"
           variant="primary"

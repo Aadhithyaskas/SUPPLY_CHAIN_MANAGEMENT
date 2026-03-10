@@ -8,6 +8,33 @@ from django.conf import settings
 from .models import Vendor, Warehouse
 from .serializers import VendorSerializer
 
+# ==============================
+# GET WAREHOUSE (ONLY ONE)
+# ==============================
+
+class GetWarehouse(APIView):
+
+    def get(self, request):
+
+        warehouse = Warehouse.objects.first()
+
+        if not warehouse:
+            return Response(
+                {"error": "Warehouse not created yet"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        data = {
+            "warehouse_id": warehouse.warehouse_id,
+            "warehouse_name": warehouse.warehouse_name,
+            "warehouse_email": warehouse.warehouse_email,
+            "warehouse_phone": warehouse.warehouse_phone,
+            "address": warehouse.address,
+            "created_at": warehouse.created_at
+        }
+
+        return Response(data, status=status.HTTP_200_OK)
+
 
 # ==============================
 # CREATE WAREHOUSE (ONLY ONE)

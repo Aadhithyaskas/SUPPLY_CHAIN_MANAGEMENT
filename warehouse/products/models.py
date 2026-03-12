@@ -1,12 +1,6 @@
-
 from django.db import models
 from vendors.models import Vendor
 from supplier.models import Supplier
-<<<<<<< HEAD
-
-=======
->>>>>>> c0755e364e04220603604a07ba024057157beea8
-
 class Product(models.Model):
 
     product_id = models.CharField(max_length=10, primary_key=True, editable=False)
@@ -35,27 +29,16 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-<<<<<<< HEAD
-=======
-    # 🔹 Correct relationship
->>>>>>> c0755e364e04220603604a07ba024057157beea8
     vendor = models.ForeignKey(
         Vendor,
         on_delete=models.CASCADE
     )
-<<<<<<< HEAD
 
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.CASCADE
     )
-=======
->>>>>>> c0755e364e04220603604a07ba024057157beea8
 
-    supplier = models.ForeignKey(
-        Supplier,
-        on_delete=models.CASCADE
-    )
     def save(self, *args, **kwargs):
 
         # Generate Product ID
@@ -82,3 +65,100 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.product_name} ({self.product_id})"
+
+
+    
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Product
+from .serializers import ProductSerializer
+class CreateProductView(APIView):
+    
+    def post(self, request):
+
+        serializer = ProductSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+
+            return Response({
+                "message": "Product created successfully",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ListProductsView(APIView):
+    
+    def get(self, request):
+
+        products = Product.objects.all()
+        serializer = ProductSerializer(products, many=True)
+
+        return Response({
+            "count": products.count(),
+            "products": serializer.data
+        })
+
+class ProductDetailView(APIView):
+    
+    def get(self, request, product_id):
+
+        try:
+            product = Product.objects.get(product_id=product_id)
+
+        except Product.DoesNotExist:
+            return Response(
+                {"error": "Product not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = ProductSerializer(product)
+
+        return Response(serializer.data)
+
+class UpdateProductView(APIView):
+    
+    def put(self, request, product_id):
+
+        try:
+            product = Product.objects.get(product_id=product_id)
+
+        except Product.DoesNotExist:
+            return Response(
+                {"error": "Product not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = ProductSerializer(product, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+
+            return Response({
+                "message": "Product updated successfully",
+                "data": serializer.data
+            })
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class DeleteProductView(APIView):
+    
+    def delete(self, request, product_id):
+
+        try:
+            product = Product.objects.get(product_id=product_id)
+
+        except Product.DoesNotExist:
+            return Response(
+                {"error": "Product not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        product.delete()
+
+        return Response({
+            "message": "Product deleted successfully"
+        }, status=status.HTTP_200_OK)

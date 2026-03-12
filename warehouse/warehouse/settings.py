@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'supplier',
     "corsheaders",
     "products",
+    "Inventory",
     # Third Party
     # 'rest_framework',
    

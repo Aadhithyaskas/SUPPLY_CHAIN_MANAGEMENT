@@ -3,6 +3,7 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
 from django.conf import settings
 
 class Role(models.Model):
@@ -20,7 +21,15 @@ class Role(models.Model):
     def __str__(self):
         return self.get_name_display()
 
+class WMSAdmin(models.Model):
+    admin_id = models.CharField(max_length=10, unique=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    role = models.CharField(max_length=50)
+    created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.admin_id
 
 class Permission(models.Model):
     ACTION_CHOICES = (

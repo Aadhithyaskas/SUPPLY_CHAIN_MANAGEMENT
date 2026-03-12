@@ -6,7 +6,8 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse
 from django.core.mail import send_mail
-
+from django.contrib.auth.models import User
+from .models import WMSAdmin
 from .models import Role, UserRole, OTP, LoginLogs
 from .services import send_otp_email, generate_random_password
 from .serializers import (
@@ -23,6 +24,51 @@ User = get_user_model()
 def get_csrf_token(request):
     return JsonResponse({"message": "CSRF cookie set"})
 
+class CreateWMSAdmin(APIView):
+
+    def post(self, request):
+
+        username = request.data.get("username")
+        email = request.data.get("email")
+        role_name = request.data.get("role")
+        name = request.data.get("name")
+        password = request.data.get("password")
+
+        if not username or not email or not role_name or not name or not password:
+            return Response(
+                {"error": "All fields required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already exists"}, status=400)
+
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already registered"}, status=400)
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            is_staff=True,
+            is_superuser=True
+        )
+
+        last_admin = WMSAdmin.objects.order_by('-id').first()
+        next_id = last_admin.id + 1 if last_admin else 1
+        admin_id = f"ADM{next_id:03d}"
+
+        WMSAdmin.objects.create(
+            admin_id=admin_id,
+            user=user,
+            name=name,
+            role=role_name
+        )
+
+        return Response({
+            "message": "Admin created successfully",
+            "admin_id": admin_id
+        }, status=status.HTTP_201_CREATED)
 
 class LogoutView(APIView):
 

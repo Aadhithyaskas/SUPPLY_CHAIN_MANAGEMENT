@@ -1,4 +1,5 @@
 from django.urls import path
+from .views import CreateWMSAdmin
 from .views import (
   
     LoginView,
@@ -7,7 +8,7 @@ from .views import (
     AdminCreateUserView,
     VerifyLoginOTPView,
     ForceChangePasswordView,
-    LogoutView,DeleteUserView,ListEmployeeView,UpdateEmployeeView,get_csrf_token
+    LogoutView,DeleteUserView,ListEmployeeView,UpdateEmployeeView,get_csrf_token,
 )
 
 urlpatterns = [
@@ -27,5 +28,7 @@ urlpatterns = [
     path('list_employees/',ListEmployeeView.as_view(),name="employees"),
     path('update-user/<str:employee_id>/', UpdateEmployeeView.as_view(), name='update-user'),
     path("csrf/", get_csrf_token),
+    path('create-admin/', CreateWMSAdmin.as_view()),
+
 
 ]

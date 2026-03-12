@@ -8,6 +8,7 @@ import Alert from '../common/Alert';
 import useForm from '../../hooks/useForm';
 import { validateRequired } from '../../utils/validators';
 import { ALERT_TYPES } from '../../utils/constants';
+import './Login.css'; // Create this CSS file for custom styles
 
 const validateLogin = (values) => {
   const errors = {};
@@ -70,83 +71,116 @@ const Login = () => {
   };
 
   return (
-    <Card title="Login to WMS">
-      {error && (
-        <Alert 
-          type={ALERT_TYPES.ERROR} 
-          message={error}
-          onClose={() => setError('')}
-        />
-      )}
-      
-      {successMessage && (
-        <Alert 
-          type={ALERT_TYPES.SUCCESS} 
-          message={successMessage}
-          onClose={() => setSuccessMessage('')}
-        />
-      )}
+    <div className="login-container">
+      <div className="login-wrapper">
+        <div className="login-header">
+          <h1 className="login-title">Welcome Back</h1>
+          <p className="login-subtitle">Sign in to access your WMS dashboard</p>
+        </div>
 
-      <form onSubmit={handleSubmit}>
-        <Input
-          label="Employee ID"
-          type="text"
-          name="employeeId"
-          value={values.employeeId}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          error={errors.employeeId}
-          touched={touched.employeeId}
-          placeholder="Enter your employee ID"
-          required
-        />
+        <Card className="login-card">
+          {error && (
+            <Alert 
+              type={ALERT_TYPES.ERROR} 
+              message={error}
+              onClose={() => setError('')}
+              className="login-alert"
+            />
+          )}
+          
+          {successMessage && (
+            <Alert 
+              type={ALERT_TYPES.SUCCESS} 
+              message={successMessage}
+              onClose={() => setSuccessMessage('')}
+              className="login-alert"
+            />
+          )}
 
-        <Input
-          label="Email"
-          type="email"
-          name="email"
-          value={values.email}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          error={errors.email}
-          touched={touched.email}
-          placeholder="Required for founder admin"
-        />
+          <form onSubmit={handleSubmit} className="login-form">
+            <Input
+              label="Employee ID"
+              type="text"
+              name="employeeId"
+              value={values.employeeId}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={errors.employeeId}
+              touched={touched.employeeId}
+              placeholder="Enter your employee ID"
+              required
+              icon="👤"
+              className="login-input-field"
+            />
 
-        <Input
-          label="Password"
-          type="password"
-          name="password"
-          value={values.password}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          error={errors.password}
-          touched={touched.password}
-          placeholder="Enter your password"
-          required
-        />
+            <Input
+              label="Email"
+              type="email"
+              name="email"
+              value={values.email}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={errors.email}
+              touched={touched.email}
+              placeholder="Required for founder admin"
+              icon="✉️"
+              className="login-input-field"
+            />
 
-        <Button
-          type="submit"
-          variant="primary"
-          fullWidth
-          loading={loading}
-          disabled={loading}
-        >
-          Login
-        </Button>
-      </form>
+            <Input
+              label="Password"
+              type="password"
+              name="password"
+              value={values.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              error={errors.password}
+              touched={touched.password}
+              placeholder="Enter your password"
+              required
+              icon="🔒"
+              className="login-input-field"
+            />
 
-      <div style={{ marginTop: '15px', textAlign: 'center' }}>
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={() => navigate('/forgot-password')}
-        >
-          Forgot Password?
-        </Button>
+            <div className="login-options">
+              <label className="remember-me">
+                <input type="checkbox" /> Remember me
+              </label>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              fullWidth
+              loading={loading}
+              disabled={loading}
+              className="login-submit-btn"
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
+
+          <div className="login-footer">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => navigate('/forgot-password')}
+              className="forgot-password-btn"
+            >
+              Forgot Password?
+            </Button>
+          </div>
+
+          <div className="login-help">
+            <p>Need help? <a href="/support">Contact Support</a></p>
+          </div>
+        </Card>
+
+        <div className="login-footer-info">
+          <p>&copy; 2024 WMS. All rights reserved.</p>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 };
 

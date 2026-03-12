@@ -13,11 +13,11 @@ from .views import (
 urlpatterns = [
     
     #admin login
-    # 🔐 Registration
+    # Registration
     path('delete-user/<str:employee_id>/', DeleteUserView.as_view()),
-    # 🔑 Login
+    #Login
     path('login/', LoginView.as_view(), name='login'),
-    # 🔁 Forgot Password
+    #Forgot Password
     path('forgot-password-otp/', ForgotPasswordOTPView.as_view(), name='forgot-password-otp'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('admin-create-user/', AdminCreateUserView.as_view(), name='admin-create-user'),

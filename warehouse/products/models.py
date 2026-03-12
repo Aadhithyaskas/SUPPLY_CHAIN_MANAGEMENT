@@ -1,11 +1,19 @@
 from django.db import models
+from vendors.models import Vendor
+from supplier.models import Supplier
+
 
 class Product(models.Model):
 
     product_id = models.CharField(max_length=10, primary_key=True, editable=False)
 
     product_name = models.CharField(max_length=255)
-    sku_code = models.CharField(max_length=100, unique=True)
+    brand_name = models.CharField(max_length=100)
+    size = models.CharField(max_length=10)
+
+
+    sku_code = models.CharField(max_length=100, unique=True, editable=False)
+
     description = models.TextField()
     category = models.CharField(max_length=100)
 
@@ -23,11 +31,19 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    vendor_id = models.IntegerField()
-    supplier_id = models.IntegerField()
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE
+    )
+
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.CASCADE
+    )
 
     def save(self, *args, **kwargs):
 
+        # Generate Product ID
         if not self.product_id:
             last_product = Product.objects.order_by('product_id').last()
 
@@ -39,7 +55,15 @@ class Product(models.Model):
 
             self.product_id = f"PRO{new_id:03d}"
 
+        # Generate SKU
+        if not self.sku_code:
+            brand_code = self.brand_name[:3].upper()
+            product_code = ''.join([word[0] for word in self.product_name.split()]).upper()
+
+            self.sku_code = f"{brand_code}-{product_code}-{self.size.upper()}"
+
+
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.product_id
+        return f"{self.product_name} ({self.product_id})"

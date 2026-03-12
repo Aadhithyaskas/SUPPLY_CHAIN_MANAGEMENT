@@ -1,27 +1,28 @@
-from django.contrib.auth import get_user_model, authenticate
-from rest_framework.views import APIView, settings
+from django.contrib.auth import get_user_model, authenticate, login
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Role, UserRole
-from django.utils import timezone
-from .models import OTP
 from django.utils.timezone import now
-# from vendors.models import Vendor
-from .models import LoginLogs
-from .services import send_otp_email
-from .serializers import RegisterSerializer
-from .serializers import LoginSerializer,ResetPasswordSerializer,ResetPasswordSerializer,ForgotPasswordSerializer
-from django.contrib.auth import authenticate, login
-from .services import generate_random_password
-from django.core.mail import send_mail
-# from rest_framework.permissions import IsAuthenticated
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse
+from django.core.mail import send_mail
+
+from .models import Role, UserRole, OTP, LoginLogs
+from .services import send_otp_email, generate_random_password
+from .serializers import (
+    RegisterSerializer,
+    LoginSerializer,
+    ResetPasswordSerializer,
+    ForgotPasswordSerializer
+)
+
 User = get_user_model()
+
 
 @ensure_csrf_cookie
 def get_csrf_token(request):
     return JsonResponse({"message": "CSRF cookie set"})
+
 
 class LogoutView(APIView):
 
@@ -40,14 +41,16 @@ class LogoutView(APIView):
             {"message": "Logged out successfully"},
             status=status.HTTP_200_OK
         )
-        
+
+
 class ListEmployeeView(APIView):
+
     def get(self, request):
-        # Fetch UserRoles to get access to both User and Employee ID
-        # select_related avoids the "N+1" database query problem
+
         employees = UserRole.objects.select_related('user', 'role').all()
-        
+
         data = []
+
         for emp in employees:
             data.append({
                 "id": emp.user.id,
@@ -60,24 +63,23 @@ class ListEmployeeView(APIView):
 
         return Response(data, status=status.HTTP_200_OK)
 
+
 class UpdateEmployeeView(APIView):
+
     def put(self, request, employee_id):
+
         try:
-            # 1. Find the UserRole object
             user_role = UserRole.objects.select_related('user').get(employee_id=employee_id)
             user = user_role.user
-            
-            # 2. Extract data from request
+
             new_username = request.data.get("username", user.username)
             new_email = request.data.get("email", user.email)
             new_role_name = request.data.get("role")
 
-            # 3. Update User model fields
             user.username = new_username
             user.email = new_email
             user.save()
 
-            # 4. Update Role if provided
             if new_role_name:
                 role_obj, _ = Role.objects.get_or_create(name=new_role_name)
                 user_role.role = role_obj
@@ -90,9 +92,10 @@ class UpdateEmployeeView(APIView):
 
         except UserRole.DoesNotExist:
             return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+
+
 class DeleteUserView(APIView):
-    
+
     def delete(self, request, employee_id):
 
         try:
@@ -113,22 +116,15 @@ class DeleteUserView(APIView):
             )
 
 
-
 class AdminCreateUserView(APIView):
-    
+
     def post(self, request):
 
         username = request.data.get("username")
         email = request.data.get("email")
         role_name = request.data.get("role")
-        firstname=request.data.get("f_name")
-        lastname=request.data.get("l_name")
-
-        # Validation
-        # if role_name not in [("inventory_manager", "Inventory Manager"),("quality_assistant", "Quality Assistant"),("admin", "Admin"),("manager", "Manager"),("supervisor","Supervisor")]:
-        #     return Response({"error":"Invalid role selected"})
-
-            
+        firstname = request.data.get("f_name")
+        lastname = request.data.get("l_name")
 
         if not username or not email or not role_name:
             return Response({"error": "All fields required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -139,8 +135,7 @@ class AdminCreateUserView(APIView):
         if User.objects.filter(email=email).exists():
             return Response({"error": "Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
 
-
-        # 🚫 Prevent creating another admin
+        # Prevent creating another admin
         if role_name.lower() == "admin":
             if UserRole.objects.filter(role__name="admin").exists():
                 return Response(
@@ -148,8 +143,6 @@ class AdminCreateUserView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-
-        # Logic
         password = generate_random_password()
         role, _ = Role.objects.get_or_create(name=role_name)
 
@@ -157,17 +150,14 @@ class AdminCreateUserView(APIView):
         next_id = last_user.id + 1 if last_user else 1
         custom_id = f"EMP{next_id:04d}"
 
-        # Create User
         user = User.objects.create_user(
-                     username=username,
-                     first_name=firstname,
-                     last_name=lastname,
-                     email=email,
-                     password=password
-)
+            username=username,
+            first_name=firstname,
+            last_name=lastname,
+            email=email,
+            password=password
+        )
 
-
-        # Create UserRole
         user_role = UserRole.objects.create(
             employee_id=custom_id,
             user=user,
@@ -175,7 +165,6 @@ class AdminCreateUserView(APIView):
             is_first_login=True
         )
 
-        # Send Email
         send_mail(
             subject="Your Account Password",
             message=f"Your login password is: {password} and your Employee ID is: {user_role.employee_id}",
@@ -203,26 +192,13 @@ class LoginView(APIView):
     def post(self, request):
 
         employee_id = request.data.get("employee_id")
-        email = request.data.get("email")
         password = request.data.get("password")
 
-        # -------------------
-        # Founder Admin Login
-        # -------------------
-        if email == settings.EMP_ID and password == settings.FOUNDER_ADMIN_PASSWORD and employee_id==settings.FOUNDER_ADMIN_ID:
-            return Response({
-                "message": "Founder Admin login successful",
-                "role": "FOUNDER_ADMIN"
-            }, status=200)
-
-        # -------------------
-        # Employee Login
-        # -------------------
         if not employee_id or not password:
             return Response({"error": "employee_id and password required"}, status=400)
 
         try:
-            user_role = UserRole.objects.select_related('user').get(employee_id=employee_id)
+            user_role = UserRole.objects.select_related('user', 'role').get(employee_id=employee_id)
             user = user_role.user
         except UserRole.DoesNotExist:
             return Response({"error": "Invalid employee ID"}, status=401)
@@ -231,6 +207,13 @@ class LoginView(APIView):
 
         if not user:
             return Response({"error": "Invalid credentials"}, status=401)
+
+        # Founder Admin Login (from DB role)
+        if user_role.role.name.lower() == "admin":
+            return Response({
+                "message": "Founder Admin login successful",
+                "role": "FOUNDER_ADMIN"
+            }, status=200)
 
         send_otp_email(user.email, "LOGIN")
 
@@ -286,7 +269,6 @@ class VerifyLoginOTPView(APIView):
 
         login(request, user)
 
-        # Update login log
         log = LoginLogs.objects.filter(
             user=user,
             login_status=False
@@ -300,9 +282,10 @@ class VerifyLoginOTPView(APIView):
             "message": "Login successful",
             "force_change_password": user_role.is_first_login
         })
-        
+
+
 class ForceChangePasswordView(APIView):
-    # permission_classes = [IsAuthenticated]
+
     def post(self, request):
 
         if not request.user.is_authenticated:
@@ -324,11 +307,10 @@ class ForceChangePasswordView(APIView):
         return Response({"message": "Password changed successfully"})
 
 
-
-
 class ForgotPasswordOTPView(APIView):
 
     def post(self, request):
+
         serializer = ForgotPasswordSerializer(data=request.data)
 
         if not serializer.is_valid():
@@ -343,9 +325,11 @@ class ForgotPasswordOTPView(APIView):
 
         return Response({"message": "OTP sent for password reset"})
 
+
 class ResetPasswordView(APIView):
 
     def post(self, request):
+
         serializer = ResetPasswordSerializer(data=request.data)
 
         if not serializer.is_valid():

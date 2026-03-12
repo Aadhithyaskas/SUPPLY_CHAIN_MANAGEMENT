@@ -13,16 +13,6 @@ from datetime import timedelta
 #     ),
 # }
 
-load_dotenv()
-#admin credentials from .env
-FOUNDER_ADMIN_ID = os.getenv("FOUNDER_ADMIN_ID")
-FOUNDER_ADMIN_PASSWORD = os.getenv("FOUNDER_ADMIN_PASSWORD")
-EMP_ID=os.getenv("EMP")
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-    ]
-}
 
 
 

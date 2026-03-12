@@ -5,6 +5,7 @@ import Card from '../common/Card';
 import Alert from '../common/Alert';
 import Button from '../common/Button';
 import { ALERT_TYPES, ROLES, ROLE_LABELS } from '../../utils/constants';
+import './Dashboard.css'; // Create this CSS file
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -23,14 +24,16 @@ const Dashboard = () => {
       description: 'Manage vendors and view vendor details',
       path: '/vendors',
       icon: '🏢',
-      color: '#28a745'
+      color: '#4361ee',
+      bgColor: '#e0e7ff'
     },
     {
       name: 'Suppliers',
       description: 'Manage suppliers and view supplier details',
       path: '/suppliers',
       icon: '📦',
-      color: '#17a2b8'
+      color: '#06b6d4',
+      bgColor: '#cffafe'
     }
   ];
 
@@ -41,21 +44,24 @@ const Dashboard = () => {
       description: 'Configure and manage warehouse settings',
       path: '/warehouse',
       icon: '🏭',
-      color: '#007bff'
+      color: '#8b5cf6',
+      bgColor: '#ede9fe'
     },
     {
       name: 'Employee Management',
       description: 'View all employees in the system',
       path: '/admin/employees',
       icon: '👥',
-      color: '#6f42c1'
+      color: '#ec4899',
+      bgColor: '#fce7f3'
     },
     {
       name: 'Create Employee',
       description: 'Add new employees to the system',
       path: '/admin/create-user',
       icon: '➕',
-      color: '#fd7e14'
+      color: '#f59e0b',
+      bgColor: '#fef3c7'
     }
   ];
 
@@ -66,13 +72,15 @@ const Dashboard = () => {
         name: 'View Vendors',
         path: '/vendors',
         icon: '🏢',
-        description: 'See all vendors'
+        description: 'See all vendors',
+        color: '#4361ee'
       },
       {
         name: 'View Suppliers',
         path: '/suppliers',
         icon: '📦',
-        description: 'See all suppliers'
+        description: 'See all suppliers',
+        color: '#06b6d4'
       }
     ];
 
@@ -82,19 +90,22 @@ const Dashboard = () => {
           name: 'Manage Employees',
           path: '/admin/employees',
           icon: '👥',
-          description: 'View and manage employees'
+          description: 'View and manage employees',
+          color: '#ec4899'
         },
         {
           name: 'Create Employee',
           path: '/admin/create-user',
           icon: '➕',
-          description: 'Add new employee'
+          description: 'Add new employee',
+          color: '#f59e0b'
         },
         {
           name: 'Warehouse Settings',
           path: '/warehouse',
           icon: '🏭',
-          description: 'Configure warehouse'
+          description: 'Configure warehouse',
+          color: '#8b5cf6'
         }
       );
     }
@@ -102,17 +113,17 @@ const Dashboard = () => {
     return actions;
   };
 
-  // Get role-specific statistics (mock data - replace with actual API calls)
+  // Get role-specific statistics
   const getStats = () => {
     const stats = [
-      { label: 'Total Vendors', value: '24', icon: '🏢', color: '#28a745' },
-      { label: 'Total Suppliers', value: '18', icon: '📦', color: '#17a2b8' }
+      { label: 'Total Vendors', value: '24', icon: '🏢', color: '#4361ee', change: '+12%' },
+      { label: 'Total Suppliers', value: '18', icon: '📦', color: '#06b6d4', change: '+8%' }
     ];
 
     if (isAdmin) {
       stats.push(
-        { label: 'Total Employees', value: '12', icon: '👥', color: '#6f42c1' },
-        { label: 'Active Today', value: '8', icon: '📊', color: '#fd7e14' }
+        { label: 'Total Employees', value: '12', icon: '👥', color: '#ec4899', change: '+2' },
+        { label: 'Active Today', value: '8', icon: '📊', color: '#f59e0b', change: '67%' }
       );
     }
 
@@ -122,319 +133,305 @@ const Dashboard = () => {
   const quickActions = getQuickActions();
   const stats = getStats();
 
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
   return (
-    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="dashboard-container">
       {/* Welcome Message */}
       {showLoginMessage && loginSuccessMessage && (
         <Alert 
           type={ALERT_TYPES.SUCCESS} 
           message={loginSuccessMessage}
           onClose={dismissLoginMessage}
+          className="dashboard-alert"
         />
       )}
 
-      {/* User Info Card */}
-      <Card title={`Welcome Back, ${user?.f_name || user?.employeeId}!`}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '20px',
-          marginBottom: '20px'
-        }}>
-          <div>
-            <p style={{ margin: '5px 0' }}>
-              <strong>Employee ID:</strong> {user?.employeeId}
-            </p>
-            <p style={{ margin: '5px 0' }}>
-              <strong>Role:</strong>{' '}
-              <span style={{
-                padding: '4px 8px',
-                backgroundColor: user?.role === ROLES.ADMIN || user?.role === ROLES.FOUNDER_ADMIN ? '#cce5ff' : '#e2e3e5',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: '500'
+      {/* Header Section */}
+      <div className="dashboard-header">
+        <div className="header-content">
+          <div className="header-left">
+            <h1 className="greeting">{getGreeting()}, {user?.f_name || user?.employeeId}!</h1>
+            <p className="welcome-text">Welcome back to your WMS dashboard</p>
+          </div>
+          <div className="header-right">
+            <div className="date-badge">
+              {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="stats-grid">
+        {stats.map((stat, index) => (
+          <div key={index} className="stat-card" style={{ borderLeftColor: stat.color }}>
+            <div className="stat-icon" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+              {stat.icon}
+            </div>
+            <div className="stat-content">
+              <span className="stat-label">{stat.label}</span>
+              <div className="stat-value-wrapper">
+                <span className="stat-value">{stat.value}</span>
+                <span className="stat-change" style={{ color: stat.color }}>
+                  {stat.change}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* User Profile Card */}
+      <Card className="profile-card">
+        <div className="profile-header">
+          <div className="profile-avatar">
+            {user?.f_name?.charAt(0) || user?.employeeId?.charAt(0)}
+          </div>
+          <div className="profile-info">
+            <h2 className="profile-name">{user?.f_name || user?.employeeId}</h2>
+            <div className="profile-badges">
+              <span className="role-badge" style={{
+                backgroundColor: isAdmin ? '#8b5cf6' : '#6c757d'
               }}>
                 {ROLE_LABELS[user?.role] || user?.role}
               </span>
-            </p>
-            <p style={{ margin: '5px 0' }}>
-              <strong>Email:</strong> {user?.email}
-            </p>
-          </div>
-          
-          {isAdmin && (
-            <div style={{
-              backgroundColor: '#e7f3ff',
-              padding: '10px 15px',
-              borderRadius: '4px',
-              border: '1px solid #b8daff'
-            }}>
-              <span style={{ color: '#004085', fontWeight: '500' }}>
-                👑 Admin Access Granted
+              <span className="employee-id-badge">
+                ID: {user?.employeeId}
               </span>
+            </div>
+            <p className="profile-email">{user?.email}</p>
+          </div>
+          {isAdmin && (
+            <div className="admin-badge">
+              <span>👑 Admin Access</span>
             </div>
           )}
         </div>
+      </Card>
 
-        {/* Statistics Cards */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '15px',
-          marginBottom: '30px'
-        }}>
-          {stats.map((stat, index) => (
-            <div
+      {/* Quick Actions */}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h2>Quick Actions</h2>
+          <p>Frequently used operations</p>
+        </div>
+        <div className="quick-actions-grid">
+          {quickActions.map((action, index) => (
+            <button
               key={index}
-              style={{
-                backgroundColor: '#f8f9fa',
-                borderRadius: '8px',
-                padding: '15px',
-                textAlign: 'center',
-                border: `1px solid ${stat.color}20`,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-              }}
+              className="quick-action-btn"
+              onClick={() => navigate(action.path)}
+              style={{ '--action-color': action.color }}
             >
-              <div style={{ fontSize: '32px', marginBottom: '5px' }}>{stat.icon}</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: stat.color }}>
-                {stat.value}
+              <span className="action-icon">{action.icon}</span>
+              <div className="action-info">
+                <span className="action-name">{action.name}</span>
+                <span className="action-desc">{action.description}</span>
               </div>
-              <div style={{ fontSize: '14px', color: '#666' }}>{stat.label}</div>
-            </div>
+            </button>
           ))}
         </div>
+      </section>
 
-        {/* Quick Actions */}
-        <div style={{ marginBottom: '30px' }}>
-          <h3 style={{ marginBottom: '15px', color: '#333' }}>Quick Actions</h3>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '10px'
-          }}>
-            {quickActions.map((action, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                onClick={() => navigate(action.path)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: '12px'
-                }}
-              >
-                <span style={{ fontSize: '20px' }}>{action.icon}</span>
-                {action.name}
-              </Button>
-            ))}
-          </div>
+      {/* Main Modules */}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h2>Main Modules</h2>
+          <p>Access your core features</p>
         </div>
-
-        {/* Main Modules */}
-        <h3 style={{ marginBottom: '15px', color: '#333' }}>Main Modules</h3>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '20px',
-          marginBottom: '30px'
-        }}>
+        <div className="modules-grid">
           {/* Regular modules for all users */}
           {mainModules.map((module, index) => (
-            <Card 
-              key={index} 
-              style={{ 
-                cursor: 'pointer',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                border: `1px solid ${module.color}30`
-              }} 
+            <div
+              key={index}
+              className="module-card"
               onClick={() => navigate(module.path)}
+              style={{ 
+                '--module-color': module.color,
+                '--module-bg': module.bgColor 
+              }}
             >
-              <div style={{ 
-                fontSize: '48px', 
-                textAlign: 'center', 
-                marginBottom: '10px',
-                color: module.color
-              }}>
-                {module.icon}
+              <div className="module-icon-wrapper" style={{ backgroundColor: module.bgColor }}>
+                <span className="module-icon">{module.icon}</span>
               </div>
-              <h4 style={{ 
-                textAlign: 'center', 
-                marginBottom: '10px',
-                color: module.color
-              }}>
-                {module.name}
-              </h4>
-              <p style={{ 
-                textAlign: 'center', 
-                color: '#666', 
-                fontSize: '14px',
-                marginBottom: '10px'
-              }}>
-                {module.description}
-              </p>
-            </Card>
+              <div className="module-content">
+                <h3 className="module-title" style={{ color: module.color }}>{module.name}</h3>
+                <p className="module-description">{module.description}</p>
+                <button className="module-action" style={{ color: module.color }}>
+                  Access Module →
+                </button>
+              </div>
+            </div>
           ))}
 
           {/* Admin modules */}
           {isAdmin && adminModules.map((module, index) => (
-            <Card 
-              key={index} 
-              style={{ 
-                cursor: 'pointer',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                border: `1px solid ${module.color}30`,
-                backgroundColor: '#fff9f0'
-              }} 
+            <div
+              key={index}
+              className="module-card admin-module"
               onClick={() => navigate(module.path)}
+              style={{ 
+                '--module-color': module.color,
+                '--module-bg': module.bgColor 
+              }}
             >
-              <div style={{ 
-                fontSize: '48px', 
-                textAlign: 'center', 
-                marginBottom: '10px',
-                color: module.color
-              }}>
-                {module.icon}
+              <div className="module-badge">Admin</div>
+              <div className="module-icon-wrapper" style={{ backgroundColor: module.bgColor }}>
+                <span className="module-icon">{module.icon}</span>
               </div>
-              <h4 style={{ 
-                textAlign: 'center', 
-                marginBottom: '10px',
-                color: module.color
-              }}>
-                {module.name}
-              </h4>
-              <p style={{ 
-                textAlign: 'center', 
-                color: '#666', 
-                fontSize: '14px',
-                marginBottom: '10px'
-              }}>
-                {module.description}
-              </p>
-              <div style={{ textAlign: 'center' }}>
-                <span style={{
-                  display: 'inline-block',
-                  padding: '2px 8px',
-                  backgroundColor: module.color,
-                  color: 'white',
-                  borderRadius: '12px',
-                  fontSize: '11px'
-                }}>
-                  Admin Only
-                </span>
+              <div className="module-content">
+                <h3 className="module-title" style={{ color: module.color }}>{module.name}</h3>
+                <p className="module-description">{module.description}</p>
+                <button className="module-action" style={{ color: module.color }}>
+                  Access Module →
+                </button>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
+      </section>
 
-        {/* Employee Management Section (Admin Only) */}
-        {isAdmin && (
-          <div style={{
-            marginTop: '30px',
-            padding: '20px',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '8px',
-            border: '1px solid #dee2e6'
-          }}>
-            <h3 style={{ marginBottom: '15px', color: '#495057' }}>
-              👥 Employee Management
-            </h3>
-            
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '15px'
-            }}>
-              <Button
-                variant="primary"
-                onClick={() => navigate('/admin/create-user')}
-                style={{ padding: '15px' }}
-              >
-                <div style={{ fontSize: '24px', marginBottom: '5px' }}>➕</div>
-                <div>Create New Employee</div>
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={() => navigate('/admin/employees')}
-                style={{ padding: '15px' }}
-              >
-                <div style={{ fontSize: '24px', marginBottom: '5px' }}>👥</div>
-                <div>View All Employees</div>
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={() => navigate('/admin/update-employee')}
-                style={{ padding: '15px' }}
-              >
-                <div style={{ fontSize: '24px', marginBottom: '5px' }}>✏️</div>
-                <div>Update Employee</div>
-              </Button>
-            </div>
-
-            {/* Quick Employee Stats */}
-            <div style={{
-              marginTop: '20px',
-              display: 'flex',
-              gap: '20px',
-              justifyContent: 'center',
-              flexWrap: 'wrap'
-            }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#28a745' }}>12</div>
-                <div style={{ fontSize: '13px', color: '#666' }}>Total Employees</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ffc107' }}>3</div>
-                <div style={{ fontSize: '13px', color: '#666' }}>New This Week</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#17a2b8' }}>5</div>
-                <div style={{ fontSize: '13px', color: '#666' }}>Roles</div>
-              </div>
-            </div>
+      {/* Employee Management Section (Admin Only) */}
+      {isAdmin && (
+        <section className="dashboard-section">
+          <div className="section-header">
+            <h2>Employee Management</h2>
+            <p>Manage your workforce</p>
           </div>
-        )}
+          
+          <Card className="employee-management-card">
+            <div className="employee-stats">
+              <div className="employee-stat-item">
+                <span className="stat-number">12</span>
+                <span className="stat-label">Total Employees</span>
+              </div>
+              <div className="employee-stat-item">
+                <span className="stat-number">3</span>
+                <span className="stat-label">New This Week</span>
+              </div>
+              <div className="employee-stat-item">
+                <span className="stat-number">5</span>
+                <span className="stat-label">Departments</span>
+              </div>
+              <div className="employee-stat-item">
+                <span className="stat-number">8</span>
+                <span className="stat-label">Active Today</span>
+              </div>
+            </div>
 
-        {/* Role-Based Information */}
-        <div style={{
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#e7f3ff',
-          borderRadius: '4px',
-          fontSize: '14px'
-        }}>
-          <strong>📋 Your Permissions:</strong>
-          <ul style={{ marginTop: '10px', marginLeft: '20px' }}>
-            <li>✓ View vendors and suppliers</li>
+            <div className="employee-actions">
+              <button
+                className="employee-action-btn primary"
+                onClick={() => navigate('/admin/create-user')}
+              >
+                <span className="btn-icon">➕</span>
+                <div className="btn-content">
+                  <span className="btn-title">Create New Employee</span>
+                  <span className="btn-desc">Add a new team member</span>
+                </div>
+              </button>
+              
+              <button
+                className="employee-action-btn"
+                onClick={() => navigate('/admin/employees')}
+              >
+                <span className="btn-icon">👥</span>
+                <div className="btn-content">
+                  <span className="btn-title">View All Employees</span>
+                  <span className="btn-desc">Manage your team</span>
+                </div>
+              </button>
+              
+              <button
+                className="employee-action-btn"
+                onClick={() => navigate('/admin/update-employee')}
+              >
+                <span className="btn-icon">✏️</span>
+                <div className="btn-content">
+                  <span className="btn-title">Update Employee</span>
+                  <span className="btn-desc">Edit employee details</span>
+                </div>
+              </button>
+            </div>
+          </Card>
+        </section>
+      )}
+
+      {/* Permissions Section */}
+      <section className="dashboard-section">
+        <Card className="permissions-card">
+          <div className="permissions-header">
+            <h3>📋 Your Permissions</h3>
+            <p>Based on your role: <strong>{ROLE_LABELS[user?.role] || user?.role}</strong></p>
+          </div>
+          <div className="permissions-grid">
+            <div className="permission-item">
+              <span className="permission-check">✓</span>
+              <span>View vendors and suppliers</span>
+            </div>
             {user?.role === ROLES.INVENTORY_MANAGER && (
               <>
-                <li>✓ Manage inventory</li>
-                <li>✓ View reports</li>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>Manage inventory</span>
+                </div>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>View reports</span>
+                </div>
               </>
             )}
             {user?.role === ROLES.MANAGER && (
               <>
-                <li>✓ Manage vendors and suppliers</li>
-                <li>✓ View all reports</li>
-                <li>✓ Approve requests</li>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>Manage vendors and suppliers</span>
+                </div>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>View all reports</span>
+                </div>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>Approve requests</span>
+                </div>
               </>
             )}
             {isAdmin && (
               <>
-                <li>✓ Full system access</li>
-                <li>✓ Create and manage employees</li>
-                <li>✓ Configure warehouse settings</li>
-                <li>✓ Manage all vendors and suppliers</li>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>Full system access</span>
+                </div>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>Create and manage employees</span>
+                </div>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>Configure warehouse settings</span>
+                </div>
+                <div className="permission-item">
+                  <span className="permission-check">✓</span>
+                  <span>Manage all vendors and suppliers</span>
+                </div>
               </>
             )}
-          </ul>
-        </div>
-      </Card>
+          </div>
+        </Card>
+      </section>
     </div>
   );
 };

@@ -1,4 +1,7 @@
+
 from django.db import models
+from vendors.models import Vendor
+from supplier.models import Supplier
 
 class Product(models.Model):
 
@@ -23,9 +26,16 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    vendor_id = models.IntegerField()
-    supplier_id = models.IntegerField()
+    # 🔹 Correct relationship
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE
+    )
 
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.CASCADE
+    )
     def save(self, *args, **kwargs):
 
         if not self.product_id:

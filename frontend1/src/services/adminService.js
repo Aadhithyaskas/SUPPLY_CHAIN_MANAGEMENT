@@ -28,3 +28,4 @@ export const updateEmployee = (employeeId, data) => {
 // Admin: Delete employee
 export const deleteEmployee = (employeeId) =>
   apiRequest(`/auth/delete-user/${employeeId}/`, 'DELETE');
+

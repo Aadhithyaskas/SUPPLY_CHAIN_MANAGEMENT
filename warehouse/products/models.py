@@ -1,7 +1,11 @@
+
 from django.db import models
 from vendors.models import Vendor
 from supplier.models import Supplier
+<<<<<<< HEAD
 
+=======
+>>>>>>> c0755e364e04220603604a07ba024057157beea8
 
 class Product(models.Model):
 
@@ -31,16 +35,27 @@ class Product(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+<<<<<<< HEAD
+=======
+    # 🔹 Correct relationship
+>>>>>>> c0755e364e04220603604a07ba024057157beea8
     vendor = models.ForeignKey(
         Vendor,
         on_delete=models.CASCADE
     )
+<<<<<<< HEAD
 
     supplier = models.ForeignKey(
         Supplier,
         on_delete=models.CASCADE
     )
+=======
+>>>>>>> c0755e364e04220603604a07ba024057157beea8
 
+    supplier = models.ForeignKey(
+        Supplier,
+        on_delete=models.CASCADE
+    )
     def save(self, *args, **kwargs):
 
         # Generate Product ID

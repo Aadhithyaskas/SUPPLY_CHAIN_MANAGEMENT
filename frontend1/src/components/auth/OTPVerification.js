@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import Card from '../common/Card';
-import Input from '../common/Input';
-import Button from '../common/Button';
 import Alert from '../common/Alert';
 import useOTPTimer from '../../hooks/useOTPTimer';
 import { ALERT_TYPES, OTP_LENGTH } from '../../utils/constants';
+import './OTPVerification.css';
 
 const OTPVerification = () => {
   const navigate = useNavigate();
@@ -89,114 +87,124 @@ const OTPVerification = () => {
   // Show success state
   if (verificationSuccess) {
     return (
-      <Card title="✅ Verification Successful">
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-            ✨
+      <div className="otp-verification-container">
+        <div className="otp-verification-wrapper">
+          <div className="welcome-section">
+            <h1 className="welcome-title">Success</h1>
+            <p className="welcome-subtitle">OTP Verified</p>
           </div>
-          
-          <h2 style={{ color: '#28a745', marginBottom: '15px' }}>
-            OTP Verified Successfully!
-          </h2>
-          
-          <p style={{ fontSize: '16px', marginBottom: '20px', color: '#666' }}>
-            {successMessage || 'Redirecting you...'}
-          </p>
-          
-          <div style={{ 
-            width: '50px',
-            height: '50px',
-            margin: '20px auto',
-            border: '3px solid #f3f3f3',
-            borderTop: '3px solid #28a745',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }} />
+
+          <div className="otp-section">
+            <div className="success-content">
+              <div className="success-icon">✓</div>
+              <h2 className="success-title">OTP Verified Successfully!</h2>
+              <p className="success-message">
+                {successMessage || 'Redirecting you...'}
+              </p>
+              <div className="loading-spinner success-spinner"></div>
+            </div>
+          </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card title="Verify OTP">
-      <p style={{ textAlign: 'center', marginBottom: '20px' }}>
-        Enter the 6-digit OTP sent to <strong>{tempUserData?.email}</strong>
-      </p>
-      
-      {error && (
-        <Alert 
-          type={ALERT_TYPES.ERROR} 
-          message={error}
-          onClose={() => setError('')}
-        />
-      )}
-
-      {successMessage && (
-        <Alert 
-          type={ALERT_TYPES.SUCCESS} 
-          message={successMessage}
-          onClose={() => setSuccessMessage('')}
-        />
-      )}
-
-      <form onSubmit={handleSubmit}>
-        <Input
-          label="OTP Code"
-          type="text"
-          value={otp}
-          onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH))}
-          placeholder={`Enter ${OTP_LENGTH}-digit OTP`}
-          required
-          maxLength={OTP_LENGTH}
-        />
-
-        <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-          {isActive ? (
-            <span style={{ color: '#666' }}>
-              Resend OTP in {formattedTime}
-            </span>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleResendOTP}
-              disabled={!canResend}
-            >
-              Resend OTP
-            </Button>
-          )}
+    <div className="otp-verification-container">
+      <div className="otp-verification-wrapper">
+        <div className="welcome-section">
+          <h1 className="welcome-title">Verify</h1>
+          <p className="welcome-subtitle">Enter OTP Code</p>
         </div>
 
-        <Button
-          type="submit"
-          variant="primary"
-          fullWidth
-          loading={loading}
-          disabled={loading || otp.length !== OTP_LENGTH}
-        >
-          Verify OTP
-        </Button>
-      </form>
+        <div className="otp-section">
+          <div className="otp-header">
+            <h2>OTP Verification</h2>
+          </div>
 
-      <div style={{ marginTop: '15px', textAlign: 'center' }}>
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={() => navigate('/login')}
-        >
-          Back to Login
-        </Button>
+          <p className="otp-description">
+            Enter the 6-digit OTP sent to <strong>{tempUserData?.email}</strong>
+          </p>
+
+          {error && (
+            <Alert 
+              type={ALERT_TYPES.ERROR} 
+              message={error}
+              onClose={() => setError('')}
+              className="otp-alert"
+            />
+          )}
+
+          {successMessage && !verificationSuccess && (
+            <Alert 
+              type={ALERT_TYPES.SUCCESS} 
+              message={successMessage}
+              onClose={() => setSuccessMessage('')}
+              className="otp-alert"
+            />
+          )}
+
+          <form onSubmit={handleSubmit} className="otp-form">
+            <div className="input-group">
+              <label className="input-label">
+                <i className="fas fa-key"></i> OTP Code
+              </label>
+              <input
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH))}
+                placeholder={`Enter ${OTP_LENGTH}-digit OTP`}
+                className="input-field"
+                maxLength={OTP_LENGTH}
+                autoFocus
+              />
+            </div>
+
+            <div className="resend-section">
+              {isActive ? (
+                <span className="timer-text">
+                  Resend OTP in {formattedTime}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResendOTP}
+                  disabled={!canResend}
+                  className="resend-btn"
+                >
+                  Resend OTP
+                </button>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="verify-btn"
+              disabled={loading || otp.length !== OTP_LENGTH}
+            >
+              {loading ? (
+                <>
+                  <span className="loading-spinner"></span>
+                  Verifying...
+                </>
+              ) : (
+                'Verify OTP'
+              )}
+            </button>
+          </form>
+
+          <div className="otp-footer">
+            <button 
+              type="button"
+              onClick={() => navigate('/login')}
+              className="back-link"
+            >
+              ← Back to Login
+            </button>
+          </div>
+        </div>
       </div>
-
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
-    </Card>
+    </div>
   );
 };
 

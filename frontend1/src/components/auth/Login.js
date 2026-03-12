@@ -8,7 +8,7 @@ import Alert from '../common/Alert';
 import useForm from '../../hooks/useForm';
 import { validateRequired } from '../../utils/validators';
 import { ALERT_TYPES } from '../../utils/constants';
-import './Login.css'; // Create this CSS file for custom styles
+import './Login.css';
 
 const validateLogin = (values) => {
   const errors = {};
@@ -73,12 +73,16 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="login-wrapper">
-        <div className="login-header">
-          <h1 className="login-title">Welcome Back</h1>
-          <p className="login-subtitle">Sign in to access your WMS dashboard</p>
+        <div className="welcome-section">
+          <h1 className="welcome-title">Welcome</h1>
+          <p className="welcome-subtitle">Sign in to continue</p>
         </div>
 
-        <Card className="login-card">
+        <div className="login-section">
+          <div className="login-header">
+            <h2>Sign In</h2>
+          </div>
+
           {error && (
             <Alert 
               type={ALERT_TYPES.ERROR} 
@@ -98,86 +102,86 @@ const Login = () => {
           )}
 
           <form onSubmit={handleSubmit} className="login-form">
-            <Input
-              label="Employee ID"
-              type="text"
-              name="employeeId"
-              value={values.employeeId}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={errors.employeeId}
-              touched={touched.employeeId}
-              placeholder="Enter your employee ID"
-              required
-              icon="👤"
-              className="login-input-field"
-            />
-
-            <Input
-              label="Email"
-              type="email"
-              name="email"
-              value={values.email}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={errors.email}
-              touched={touched.email}
-              placeholder="Required for founder admin"
-              icon="✉️"
-              className="login-input-field"
-            />
-
-            <Input
-              label="Password"
-              type="password"
-              name="password"
-              value={values.password}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={errors.password}
-              touched={touched.password}
-              placeholder="Enter your password"
-              required
-              icon="🔒"
-              className="login-input-field"
-            />
-
-            <div className="login-options">
-              <label className="remember-me">
-                <input type="checkbox" /> Remember me
+            <div className="input-group">
+              <label className="input-label">
+                <i className="fas fa-id-badge"></i> Employee ID
               </label>
+              <input
+                type="text"
+                name="employeeId"
+                value={values.employeeId}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                placeholder="Enter employee ID"
+                className={`input-field ${touched.employeeId && errors.employeeId ? 'input-error' : ''}`}
+              />
+              {touched.employeeId && errors.employeeId && (
+                <div className="error-message">{errors.employeeId}</div>
+              )}
             </div>
 
-            <Button
+            <div className="input-group">
+              <label className="input-label">
+                <i className="fas fa-envelope"></i> Email
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={values.email}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                placeholder="Enter email"
+                className={`input-field ${touched.email && errors.email ? 'input-error' : ''}`}
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">
+                <i className="fas fa-lock"></i> Password
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={values.password}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                placeholder="Enter password"
+                className={`input-field ${touched.password && errors.password ? 'input-error' : ''}`}
+              />
+              {touched.password && errors.password && (
+                <div className="error-message">{errors.password}</div>
+              )}
+            </div>
+
+            <div className="forgot-password-row">
+              <button 
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="forgot-password-link"
+              >
+                Forgot Password?
+              </button>
+            </div>
+
+            <button
               type="submit"
-              variant="primary"
-              fullWidth
-              loading={loading}
+              className="signin-btn"
               disabled={loading}
-              className="login-submit-btn"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </Button>
+              {loading ? (
+                <>
+                  <span className="loading-spinner"></span>
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </button>
           </form>
 
-          <div className="login-footer">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => navigate('/forgot-password')}
-              className="forgot-password-btn"
-            >
-              Forgot Password?
-            </Button>
-          </div>
-
           <div className="login-help">
-            <p>Need help? <a href="/support">Contact Support</a></p>
+            <p> <a href="/support"></a></p>
           </div>
-        </Card>
-
-        <div className="login-footer-info">
-          <p>&copy; 2024 WMS. All rights reserved.</p>
         </div>
       </div>
     </div>

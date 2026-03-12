@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import Card from '../common/Card';
-import Input from '../common/Input';
-import Button from '../common/Button';
 import Alert from '../common/Alert';
 import { forceChangePassword } from '../../services/authService';
 import { ALERT_TYPES } from '../../utils/constants';
 import useForm from '../../hooks/useForm';
+import './ForceChangePassword.css';
 
 const validatePassword = (values) => {
   const errors = {};
@@ -52,14 +50,9 @@ const ForceChangePassword = () => {
 
     try {
       await forceChangePassword(values.newPassword, values.confirmPassword);
-      
-      // Update user context
       setUser({ ...user, forceChangePassword: false });
-      
       setSuccess('Password changed successfully!');
       setShowSuccess(true);
-      
-      // Redirect to login success page after 2 seconds
       setTimeout(() => {
         navigate('/login-success');
       }, 2000);
@@ -72,138 +65,110 @@ const ForceChangePassword = () => {
 
   if (showSuccess) {
     return (
-      <Card title="✅ Password Changed Successfully!">
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-            🔐
-          </div>
-          
-          <h2 style={{ color: '#28a745', marginBottom: '15px' }}>
-            Your password has been updated!
-          </h2>
-          
-          <p style={{ fontSize: '16px', marginBottom: '20px', color: '#666' }}>
-            You can now log in with your new password.
-          </p>
-          
-          <div style={{ 
-            backgroundColor: '#d4edda', 
-            padding: '15px', 
-            borderRadius: '4px',
-            marginBottom: '20px'
-          }}>
-            <p style={{ margin: '5px 0', color: '#155724' }}>
-              <strong>📝 Remember:</strong>
-            </p>
-            <p style={{ margin: '5px 0', fontSize: '14px' }}>
-              • Use your new password for future logins
-            </p>
-            <p style={{ margin: '5px 0', fontSize: '14px' }}>
-              • Keep your password secure
-            </p>
-            <p style={{ margin: '5px 0', fontSize: '14px' }}>
-              • You can reset it anytime if forgotten
-            </p>
-          </div>
-          
-          <p style={{ color: '#666', marginBottom: '20px' }}>
-            Redirecting to login success page...
-          </p>
-          
-          <Button 
-            variant="primary" 
-            onClick={() => navigate('/login-success')}
-          >
-            Continue to Dashboard
-          </Button>
+      <div className="force-change-container">
+        <div className="force-change-square">
+          <div className="success-icon">✓</div>
+          <h2 className="success-title">Password Changed!</h2>
+          <p className="success-message">Your password has been updated.</p>
+          <div className="loading-spinner success-spinner"></div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card title="Change Password (First Login)">
-      <p style={{ 
-        textAlign: 'center', 
-        marginBottom: '20px', 
-        color: '#666',
-        backgroundColor: '#e7f3ff',
-        padding: '10px',
-        borderRadius: '4px'
-      }}>
-        You must change your password before continuing.
-      </p>
+    <div className="force-change-container">
+      <div className="force-change-square">
+        <h1 className="square-title">Change Password</h1>
+        <p className="square-subtitle">First time login</p>
 
-      {error && (
-        <Alert 
-          type={ALERT_TYPES.ERROR} 
-          message={error}
-          onClose={() => setError('')}
-        />
-      )}
-
-      {success && (
-        <Alert 
-          type={ALERT_TYPES.SUCCESS} 
-          message={success}
-          onClose={() => setSuccess('')}
-        />
-      )}
-
-      <form onSubmit={handleSubmit}>
-        <Input
-          label="New Password"
-          type="password"
-          name="newPassword"
-          value={values.newPassword}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          error={errors.newPassword}
-          touched={touched.newPassword}
-          placeholder="Enter new password"
-          required
-        />
-
-        <Input
-          label="Confirm Password"
-          type="password"
-          name="confirmPassword"
-          value={values.confirmPassword}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          error={errors.confirmPassword}
-          touched={touched.confirmPassword}
-          placeholder="Confirm new password"
-          required
-        />
-
-        {/* Password Requirements */}
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '10px',
-          borderRadius: '4px',
-          marginBottom: '20px',
-          fontSize: '13px'
-        }}>
-          <strong>Password Requirements:</strong>
-          <ul style={{ marginTop: '5px', marginLeft: '20px', color: '#666' }}>
-            <li>At least 8 characters long</li>
-            <li>At least one uppercase letter</li>
-            <li>At least one number</li>
-          </ul>
+        <div className="info-banner">
+          <i className="fas fa-info-circle"></i>
+          <span>You must change your password</span>
         </div>
 
-        <Button
-          type="submit"
-          variant="primary"
-          fullWidth
-          loading={loading}
-          disabled={loading}
-        >
-          Change Password
-        </Button>
-      </form>
-    </Card>
+        {error && (
+          <Alert 
+            type={ALERT_TYPES.ERROR} 
+            message={error}
+            onClose={() => setError('')}
+            className="form-alert"
+          />
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="input-group">
+            <label className="input-label">
+              <i className="fas fa-lock"></i> New Password
+            </label>
+            <input
+              type="password"
+              name="newPassword"
+              value={values.newPassword}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              placeholder="New password"
+              className={`input-field ${touched.newPassword && errors.newPassword ? 'input-error' : ''}`}
+            />
+            {touched.newPassword && errors.newPassword && (
+              <div className="error-message">{errors.newPassword}</div>
+            )}
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">
+              <i className="fas fa-lock"></i> Confirm Password
+            </label>
+            <input
+              type="password"
+              name="confirmPassword"
+              value={values.confirmPassword}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              placeholder="Confirm password"
+              className={`input-field ${touched.confirmPassword && errors.confirmPassword ? 'input-error' : ''}`}
+            />
+            {touched.confirmPassword && errors.confirmPassword && (
+              <div className="error-message">{errors.confirmPassword}</div>
+            )}
+          </div>
+
+          {/* Password Rules */}
+          <div className="password-rules">
+            <div className="rules-title">Password must:</div>
+            <ul className="rules-list">
+              <li className={values.newPassword.length >= 8 ? 'rule-met' : ''}>
+                <i className={`fas ${values.newPassword.length >= 8 ? 'fa-check-circle' : 'fa-circle'}`}></i>
+                8+ characters
+              </li>
+              <li className={/[A-Z]/.test(values.newPassword) ? 'rule-met' : ''}>
+                <i className={`fas ${/[A-Z]/.test(values.newPassword) ? 'fa-check-circle' : 'fa-circle'}`}></i>
+                Uppercase letter
+              </li>
+              <li className={/[0-9]/.test(values.newPassword) ? 'rule-met' : ''}>
+                <i className={`fas ${/[0-9]/.test(values.newPassword) ? 'fa-check-circle' : 'fa-circle'}`}></i>
+                One number
+              </li>
+            </ul>
+          </div>
+
+          <button
+            type="submit"
+            className="submit-btn"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="loading-spinner"></span>
+                Changing...
+              </>
+            ) : (
+              'Change Password'
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 };
 

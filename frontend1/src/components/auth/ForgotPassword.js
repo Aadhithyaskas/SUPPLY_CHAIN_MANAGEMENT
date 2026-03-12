@@ -7,6 +7,7 @@ import Alert from '../common/Alert';
 import { forgotPasswordOTP } from '../../services/authService';
 import { ALERT_TYPES } from '../../utils/constants';
 import { validateEmail } from '../../utils/validators';
+import './ForgotPassword.css';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -31,7 +32,6 @@ const ForgotPassword = () => {
       await forgotPasswordOTP(email);
       setSuccess('OTP sent to your email. Redirecting to reset password...');
       
-      // Store email for reset password page
       sessionStorage.setItem('resetEmail', email);
       
       setTimeout(() => {
@@ -45,58 +45,78 @@ const ForgotPassword = () => {
   };
 
   return (
-    <Card title="Forgot Password">
-      <p style={{ textAlign: 'center', marginBottom: '20px', color: '#666' }}>
-        Enter your email address to receive a password reset OTP.
-      </p>
+    <div className="forgot-password-container">
+      <div className="forgot-password-card">
+        <h1 className="forgot-title">Forgot Password</h1>
+        
+        <p className="forgot-description">
+          Enter your email address to receive a password reset OTP.
+        </p>
 
-      {error && (
-        <Alert 
-          type={ALERT_TYPES.ERROR} 
-          message={error}
-          onClose={() => setError('')}
-        />
-      )}
+        {error && (
+          <Alert 
+            type={ALERT_TYPES.ERROR} 
+            message={error}
+            onClose={() => setError('')}
+            className="forgot-alert"
+          />
+        )}
 
-      {success && (
-        <Alert 
-          type={ALERT_TYPES.SUCCESS} 
-          message={success}
-          onClose={() => setSuccess('')}
-        />
-      )}
+        {success && (
+          <Alert 
+            type={ALERT_TYPES.SUCCESS} 
+            message={success}
+            onClose={() => setSuccess('')}
+            className="forgot-alert"
+          />
+        )}
 
-      <form onSubmit={handleSubmit}>
-        <Input
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your registered email"
-          required
-        />
+        <form onSubmit={handleSubmit} className="forgot-form">
+          <div className="input-group">
+            <label className="input-label">
+              <i className="fas fa-envelope"></i> Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your registered email"
+              className="input-field"
+              required
+            />
+          </div>
 
-        <Button
-          type="submit"
-          variant="primary"
-          fullWidth
-          loading={loading}
-          disabled={loading}
-        >
-          Send OTP
-        </Button>
-      </form>
+          <button
+            type="submit"
+            className="submit-btn"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="loading-spinner"></span>
+                Sending OTP...
+              </>
+            ) : (
+              'Send OTP'
+            )}
+          </button>
+        </form>
 
-      <div style={{ marginTop: '15px', textAlign: 'center' }}>
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={() => navigate('/login')}
-        >
-          Back to Login
-        </Button>
+        <div className="back-to-login">
+          <button 
+            type="button"
+            onClick={() => navigate('/login')}
+            className="back-link"
+          >
+            ← Back to Login
+          </button>
+        </div>
+
+        <div className="copyright">
+          <p>© 2024 WMS</p>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 };
 

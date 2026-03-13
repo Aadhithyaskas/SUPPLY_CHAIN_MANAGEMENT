@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import CreateWMSAdmin
+from .views import  CreateAdminView
 from .views import (
   
     LoginView,
@@ -28,7 +28,8 @@ urlpatterns = [
     path('list_employees/',ListEmployeeView.as_view(),name="employees"),
     path('update-user/<str:employee_id>/', UpdateEmployeeView.as_view(), name='update-user'),
     path("csrf/", get_csrf_token),
-    path('create-admin/', CreateWMSAdmin.as_view()),
+    path('create-admin/', CreateAdminView.as_view()),
+    # path("admin-login/", AdminLoginView.as_view()),
 
 
 ]

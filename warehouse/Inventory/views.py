@@ -3,10 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum
 
-from .models import Inventory, PurchaseRequest
+from .models import Inventory, PurchaseRequest, PurchaseOrder
 from .serializers import InventorySerializer, PurchaseRequestSerializer
 from .utils import check_reorder
-
+from django.core.mail import send_mail
 
 class CreateInventoryView(APIView):
 
@@ -24,55 +24,75 @@ class CreateInventoryView(APIView):
 
         return Response(serializer.errors)
 
-
-class AddStockView(APIView):
-
-    def post(self, request, inventory_id):
+class AddStockByProductView(APIView):
+    
+    def post(self, request, product_id):
 
         try:
-            inventory = Inventory.objects.get(inventory_id=inventory_id)
+            inventory = Inventory.objects.filter(product_id=product_id)
+
+            if not inventory.exists():
+                return Response({"error": "Inventory not found"}, status=404)
 
         except Inventory.DoesNotExist:
             return Response({"error": "Inventory not found"}, status=404)
 
         qty = int(request.data.get("quantity"))
 
-        inventory.quantity += qty
-        inventory.save()
+        # Add stock to first available bin
+        inv = inventory.first()
 
-        check_reorder(inventory.product)
+        inv.quantity += qty
+        inv.save()
+
+        check_reorder(inv.product)
 
         return Response({
-            "message": "Stock added",
-            "current_quantity": inventory.quantity
+            "message": "Stock added successfully",
+            "product_id": product_id,
+            "updated_bin": inv.inventory_id,
+            "current_quantity": inv.quantity
         })
 
-class RemoveStockView(APIView):
+class RemoveStockByProductView(APIView):
+    
+    def post(self, request, product_id):
 
-    def post(self, request, inventory_id):
+        inventories = Inventory.objects.filter(product_id=product_id)
 
-        try:
-            inventory = Inventory.objects.get(inventory_id=inventory_id)
-
-        except Inventory.DoesNotExist:
-            return Response({"error": "Inventory not found"}, status=404)
+        if not inventories.exists():
+            return Response({"error": "Product inventory not found"}, status=404)
 
         qty = int(request.data.get("quantity"))
 
-        if inventory.quantity < qty:
-            return Response({
-                "error": "Insufficient stock"
-            })
+        remaining = qty
 
-        inventory.quantity -= qty
-        inventory.save()
+        for inv in inventories:
 
-        check_reorder(inventory.product)
+            if remaining <= 0:
+                break
+
+            if inv.quantity >= remaining:
+
+                inv.quantity -= remaining
+                inv.save()
+                remaining = 0
+
+            else:
+
+                remaining -= inv.quantity
+                inv.quantity = 0
+                inv.save()
+
+        product = inventories.first().product
+
+        check_reorder(product)
 
         return Response({
-            "message": "Stock removed",
-            "remaining_stock": inventory.quantity
+            "message": "Stock removed successfully",
+            "removed_quantity": qty
         })
+
 
 class ProductStockView(APIView):
 
@@ -96,3 +116,90 @@ class PurchaseRequestListView(APIView):
         serializer = PurchaseRequestSerializer(prs, many=True)
 
         return Response(serializer.data)
+    
+class ManagerApprovePR(APIView):
+    
+    def post(self, request, pr_id):
+
+        try:
+            pr = PurchaseRequest.objects.get(pr_id=pr_id)
+        except PurchaseRequest.DoesNotExist:
+            return Response({"error": "PR not found"}, status=404)
+
+        threshold = 5000
+
+        if pr.total_amount > threshold:
+
+            pr.status = "Finance Pending"
+            pr.save()
+
+            return Response({
+                "message": "Awaiting Finance Director Approval"
+            })
+
+        else:
+
+            pr.status = "Approved"
+            pr.save()
+
+            po = PurchaseOrder.objects.create(
+                pr=pr,
+                vendor=pr.vendor,
+                order_quantity=pr.requested_quantity,
+                total_amount=pr.total_amount
+            )
+
+            send_po_email(po)
+
+            return Response({
+                "message": "PR approved and PO created",
+                "po_id": po.po_id
+            })
+class FinanceApprovePR(APIView):
+    
+    def post(self, request, pr_id):
+
+        try:
+            pr = PurchaseRequest.objects.get(pr_id=pr_id)
+        except PurchaseRequest.DoesNotExist:
+            return Response({"error": "PR not found"}, status=404)
+
+        pr.status = "Approved"
+        pr.save()
+
+        po = PurchaseOrder.objects.create(
+            pr=pr,
+            vendor=pr.vendor,
+            order_quantity=pr.requested_quantity,
+            total_amount=pr.total_amount
+        )
+
+        send_po_email(po)
+
+        return Response({
+            "message": "Finance approved. PO created",
+            "po_id": po.po_id
+        })
+
+
+
+
+def send_po_email(po):
+
+    subject = f"Purchase Order {po.po_id}"
+
+    message = f"""
+    Purchase Order: {po.po_id}
+
+    Product: {po.pr.product.product_name}
+    Quantity: {po.order_quantity}
+    Total Amount: {po.total_amount}
+    """
+
+    send_mail(
+        subject,
+        message,
+        "warehouse@company.com",
+        [po.vendor.email],
+        fail_silently=False
+    )

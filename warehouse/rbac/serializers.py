@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Role, UserRole, OTP
+from .models import Role, UserRole, OTP, WMSAdmin
 
 User = get_user_model()
 
@@ -29,3 +29,14 @@ class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField()
     new_password = serializers.CharField(write_only=True)
+
+class WMSAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WMSAdmin
+        fields = ['username', 'email', 'password', 'role', 'admin_id']
+        read_only_fields = ['admin_id'] # This ensures 'self.admin_id' is None when save() starts
+
+class AdminLoginSerializer(serializers.Serializer):
+
+    username = serializers.CharField()
+    password = serializers.CharField()

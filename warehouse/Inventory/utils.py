@@ -6,13 +6,21 @@ def check_reorder(product):
 
     total_stock = Inventory.objects.filter(
         product=product
-    ).aggregate(total=Sum('quantity'))['total'] or 0
+    ).aggregate(total=Sum("quantity"))["total"] or 0
 
     reorder_point = product.re_order
 
     if total_stock <= reorder_point:
 
-        PurchaseRequest.objects.create(
+        existing_pr = PurchaseRequest.objects.filter(
             product=product,
-            requested_quantity=reorder_point * 2
-        )
+            status="Pending"
+        ).exists()
+
+        if not existing_pr:
+
+            PurchaseRequest.objects.create(
+                product=product,
+                vendor=product.vendor,   # important
+                requested_quantity=reorder_point * 2
+            )

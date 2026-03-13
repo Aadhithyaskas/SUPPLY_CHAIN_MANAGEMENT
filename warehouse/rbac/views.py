@@ -14,7 +14,9 @@ from .serializers import (
     RegisterSerializer,
     LoginSerializer,
     ResetPasswordSerializer,
-    ForgotPasswordSerializer
+    ForgotPasswordSerializer,
+    WMSAdminSerializer,
+    AdminLoginSerializer
 )
 
 User = get_user_model()
@@ -24,51 +26,48 @@ User = get_user_model()
 def get_csrf_token(request):
     return JsonResponse({"message": "CSRF cookie set"})
 
-class CreateWMSAdmin(APIView):
+class CreateAdminView(APIView):
 
     def post(self, request):
 
-        username = request.data.get("username")
-        email = request.data.get("email")
-        role_name = request.data.get("role")
-        name = request.data.get("name")
-        password = request.data.get("password")
+        serializer = WMSAdminSerializer(data=request.data)
 
-        if not username or not email or not role_name or not name or not password:
-            return Response(
-                {"error": "All fields required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if serializer.is_valid():
+            serializer.save()
 
-        if User.objects.filter(username=username).exists():
-            return Response({"error": "Username already exists"}, status=400)
+            return Response({
+                "message": "Admin created successfully",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
 
-        if User.objects.filter(email=email).exists():
-            return Response({"error": "Email already registered"}, status=400)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            is_staff=True,
-            is_superuser=True
-        )
+class AdminLoginView(APIView):
+    def post(self, request):
+        serializer = AdminLoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
 
-        last_admin = WMSAdmin.objects.order_by('-id').first()
-        next_id = last_admin.id + 1 if last_admin else 1
-        admin_id = f"ADM{next_id:03d}"
+        username = serializer.validated_data["username"]
+        password = serializer.validated_data["password"]
 
-        WMSAdmin.objects.create(
-            admin_id=admin_id,
-            user=user,
-            name=name,
-            role=role_name
-        )
+        # Use .filter().first() to avoid MultipleObjectsReturned crashes
+        admin = WMSAdmin.objects.filter(username=username).first()
+
+        if not admin:
+            return Response({"error": "Admin not found"}, status=404)
+
+        # WARNING: Using plain text password check. 
+        # If you use make_password in creation, use check_password(password, admin.password)
+        if admin.password != password:
+            return Response({"error": "Invalid credentials"}, status=401)
 
         return Response({
-            "message": "Admin created successfully",
-            "admin_id": admin_id
-        }, status=status.HTTP_201_CREATED)
+            "message": "Admin login successful",
+            "admin_id": admin.admin_id,
+            "username": admin.username,
+            "role": admin.role
+        })
 
 class LogoutView(APIView):
 
@@ -223,6 +222,18 @@ class AdminCreateUserView(APIView):
             "employee_id": user_role.employee_id
         }, status=status.HTTP_201_CREATED)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.contrib.auth import authenticate
+from .models import WMSAdmin, UserRole, LoginLogs
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.contrib.auth import authenticate
+from .models import WMSAdmin, UserRole, LoginLogs
+
+
 
 class LoginView(APIView):
 
@@ -237,50 +248,76 @@ class LoginView(APIView):
 
     def post(self, request):
 
-        employee_id = request.data.get("employee_id")
+        email = request.data.get("email")
         password = request.data.get("password")
+        employee_id = request.data.get("employee_id")
 
-        if not employee_id or not password:
-            return Response({"error": "employee_id and password required"}, status=400)
+        # -------- ADMIN LOGIN --------
+        if email:
 
-        try:
-            user_role = UserRole.objects.select_related('user', 'role').get(employee_id=employee_id)
-            user = user_role.user
-        except UserRole.DoesNotExist:
-            return Response({"error": "Invalid employee ID"}, status=401)
+            admin = WMSAdmin.objects.filter(email=email).first()
 
-        user = authenticate(username=user.username, password=password)
+            if not admin:
+                return Response({"error": "Admin not found"}, status=404)
 
-        if not user:
-            return Response({"error": "Invalid credentials"}, status=401)
+            if admin.password != password:
+                return Response({"error": "Invalid credentials"}, status=401)
 
-        # Founder Admin Login (from DB role)
-        if user_role.role.name.lower() == "admin":
             return Response({
-                "message": "Founder Admin login successful",
-                "role": "FOUNDER_ADMIN"
+                "message": "Admin login successful",
+                "admin_id": admin.admin_id,
+                "email": admin.email,
+                "role": admin.role
             }, status=200)
 
-        send_otp_email(user.email, "LOGIN")
+        # -------- EMPLOYEE LOGIN --------
+        if employee_id:
 
-        ip = self.get_client_ip(request)
-        device = request.META.get('HTTP_USER_AGENT')
+            if not password:
+                return Response({"error": "password required"}, status=400)
 
-        LoginLogs.objects.create(
-            user=user,
-            ip_address=ip,
-            device_info=device,
-            login_status=False
+            try:
+                user_role = UserRole.objects.select_related('user', 'role').get(employee_id=employee_id)
+                user = user_role.user
+            except UserRole.DoesNotExist:
+                return Response({"error": "Invalid employee ID"}, status=401)
+
+            user = authenticate(username=user.username, password=password)
+
+            if not user:
+                return Response({"error": "Invalid credentials"}, status=401)
+
+            # Founder Admin Login
+            if user_role.role.name.lower() == "admin":
+                return Response({
+                    "message": "Founder Admin login successful",
+                    "role": "FOUNDER_ADMIN"
+                }, status=200)
+
+            send_otp_email(user.email, "LOGIN")
+
+            ip = self.get_client_ip(request)
+            device = request.META.get('HTTP_USER_AGENT')
+
+            LoginLogs.objects.create(
+                user=user,
+                ip_address=ip,
+                device_info=device,
+                login_status=False
+            )
+
+            return Response({
+                "message": "OTP sent",
+                "employee_id": employee_id,
+                "email": user.email,
+                "role": user_role.role.name
+            })
+
+        return Response(
+            {"error": "Provide email (admin) or employee_id (employee)"},
+            status=400
         )
-
-        return Response({
-            "message": "OTP sent",
-            "employee_id": employee_id,
-            "email": user.email,
-            "role": user_role.role.name
-        })
-
-
+    
 class VerifyLoginOTPView(APIView):
 
     def post(self, request):

@@ -11,7 +11,7 @@ class Role(models.Model):
     ROLE_CHOICES = (
         ("inventory_manager", "Inventory Manager"),
         ("quality_assistant", "Quality Assistant"),
-        ("admin", "Admin"),
+        ("finance_director","Finance Director"),
         ("manager", "Manager"),
         ("supervisor","Supervisor")
     )

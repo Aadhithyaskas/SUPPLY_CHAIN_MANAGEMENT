@@ -43,26 +43,36 @@ class Inventory(models.Model):
 
     def __str__(self):
         return f"{self.product.product_name} - {self.zone_name}/{self.rack_name}/{self.bin_name}"
-
-
 class PurchaseRequest(models.Model):
+    
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Manager Approved", "Manager Approved"),
+        ("Finance Pending", "Finance Pending"),
+        ("Approved", "Approved"),
+        ("Rejected", "Rejected")
+    ]
 
-    pr_id = models.CharField(
-        max_length=10,
-        primary_key=True,
-        editable=False
-    )
+    pr_id = models.CharField(max_length=10, primary_key=True, editable=False)
 
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE
-    )
+    product = models.ForeignKey("products.Product", on_delete=models.CASCADE)
+
+    vendor = models.ForeignKey("vendors.Vendor", on_delete=models.CASCADE)
 
     requested_quantity = models.IntegerField()
 
+    total_amount = models.IntegerField()
+
     status = models.CharField(
         max_length=20,
+        choices=STATUS_CHOICES,
         default="Pending"
+    )
+
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -70,18 +80,51 @@ class PurchaseRequest(models.Model):
     def save(self, *args, **kwargs):
 
         if not self.pr_id:
-
-            last = PurchaseRequest.objects.order_by('pr_id').last()
+            last = PurchaseRequest.objects.order_by("pr_id").last()
 
             if last:
-                last_id = int(last.pr_id[2:])
-                new_id = last_id + 1
+                new_id = int(last.pr_id[2:]) + 1
             else:
                 new_id = 1
 
             self.pr_id = f"PR{new_id:04d}"
 
+        if not self.total_amount:
+            self.total_amount = self.requested_quantity * self.product.unit_price
+
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"{self.pr_id} - {self.product.product_name}"
+class PurchaseOrder(models.Model):
+    
+    po_id = models.CharField(max_length=10, primary_key=True, editable=False)
+
+    pr = models.OneToOneField(
+        PurchaseRequest,
+        on_delete=models.CASCADE
+    )
+
+    vendor = models.ForeignKey(
+        "vendors.Vendor",
+        on_delete=models.CASCADE
+    )
+
+    order_quantity = models.IntegerField()
+
+    total_amount = models.IntegerField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+
+        if not self.po_id:
+
+            last = PurchaseOrder.objects.order_by("po_id").last()
+
+            if last:
+                new_id = int(last.po_id[2:]) + 1
+            else:
+                new_id = 1
+
+            self.po_id = f"PO{new_id:04d}"
+
+        super().save(*args, **kwargs)

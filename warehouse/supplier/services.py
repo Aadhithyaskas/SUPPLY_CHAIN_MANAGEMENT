@@ -2,7 +2,6 @@ from .models import Supplier
 from django.core.mail import send_mail
 from django.conf import settings
 
-
 class SupplierService:
 
     @staticmethod
@@ -73,10 +72,36 @@ Warehouse Management Team
             setattr(supplier, field, value)
 
         supplier.save()
-
         return supplier
 
 
     @staticmethod
     def delete_supplier(supplier):
-        supplier.delete()
+        # Soft delete
+        supplier.is_active = False
+        supplier.save()
+        return supplier
+    
+    @staticmethod
+    def get_deleted_suppliers():
+        return Supplier.objects.filter(is_active=False)
+    
+    
+    @staticmethod
+    def restore_supplier(supplier_id):
+
+        supplier = Supplier.objects.filter(
+        supplier_id=supplier_id,
+        is_active=False
+        ).first()
+
+        if supplier:
+            supplier.is_active = True
+            supplier.save()
+
+        return supplier
+    
+    @staticmethod
+    def get_inactive_suppliers():
+        
+        return Supplier.objects.filter(is_active=False)

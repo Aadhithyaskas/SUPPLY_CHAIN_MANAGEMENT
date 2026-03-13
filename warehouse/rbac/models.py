@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.db import transaction, IntegrityError
 
 class Role(models.Model):
 
@@ -22,14 +23,41 @@ class Role(models.Model):
         return self.get_name_display()
 
 class WMSAdmin(models.Model):
-    admin_id = models.CharField(max_length=10, unique=True)
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)
-    role = models.CharField(max_length=50)
+
+    admin_id = models.CharField(
+        max_length=10,
+        primary_key=True,
+        editable=False
+    )
+
+    username = models.CharField(max_length=150)
+
+    role = models.CharField(
+        max_length=20,
+        default="admin"
+    )
+
+    email = models.EmailField()
+
+    password = models.CharField(max_length=255)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return self.admin_id
+    def save(self, *args, **kwargs):
+        if not self.admin_id:
+            with transaction.atomic():
+                # select_for_update() locks the row so no other request can generate the same ID simultaneously
+                last_admin = WMSAdmin.objects.select_for_update().order_by("-admin_id").first()
+                
+                if last_admin:
+                    # Use a regex or slice to ensure you only get the digits
+                    last_id_str = last_admin.admin_id[3:] 
+                    new_id = int(last_id_str) + 1
+                else:
+                    new_id = 1
+                
+                self.admin_id = f"ADM{new_id:04d}"
+        super().save(*args, **kwargs)
 
 class Permission(models.Model):
     ACTION_CHOICES = (

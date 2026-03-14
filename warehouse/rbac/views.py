@@ -42,32 +42,6 @@ class CreateAdminView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class AdminLoginView(APIView):
-    def post(self, request):
-        serializer = AdminLoginSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
-
-        username = serializer.validated_data["username"]
-        password = serializer.validated_data["password"]
-
-        # Use .filter().first() to avoid MultipleObjectsReturned crashes
-        admin = WMSAdmin.objects.filter(username=username).first()
-
-        if not admin:
-            return Response({"error": "Admin not found"}, status=404)
-
-        # WARNING: Using plain text password check. 
-        # If you use make_password in creation, use check_password(password, admin.password)
-        if admin.password != password:
-            return Response({"error": "Invalid credentials"}, status=401)
-
-        return Response({
-            "message": "Admin login successful",
-            "admin_id": admin.admin_id,
-            "username": admin.username,
-            "role": admin.role
-        })
 
 class LogoutView(APIView):
 
@@ -226,25 +200,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from .models import WMSAdmin, UserRole, LoginLogs
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from django.contrib.auth import authenticate
-from .models import WMSAdmin, UserRole, LoginLogs
-
-
-
 class LoginView(APIView):
 
     @staticmethod
     def get_client_ip(request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
+            return x_forwarded_for.split(',')[0]
+        return request.META.get('REMOTE_ADDR')
+
 
     def post(self, request):
 
@@ -252,53 +216,50 @@ class LoginView(APIView):
         password = request.data.get("password")
         employee_id = request.data.get("employee_id")
 
-        # -------- ADMIN LOGIN --------
-        if email:
+        ip = self.get_client_ip(request)
+        device = request.META.get('HTTP_USER_AGENT')
 
-            admin = WMSAdmin.objects.filter(email=email).first()
-
-            if not admin:
-                return Response({"error": "Admin not found"}, status=404)
-
-            if admin.password != password:
-                return Response({"error": "Invalid credentials"}, status=401)
-
-            return Response({
-                "message": "Admin login successful",
-                "admin_id": admin.admin_id,
-                "email": admin.email,
-                "role": admin.role
-            }, status=200)
 
         # -------- EMPLOYEE LOGIN --------
         if employee_id:
 
             if not password:
-                return Response({"error": "password required"}, status=400)
+                return Response(
+                    {"error": "Password required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             try:
-                user_role = UserRole.objects.select_related('user', 'role').get(employee_id=employee_id)
+                user_role = UserRole.objects.select_related(
+                    'user', 'role'
+                ).get(employee_id=employee_id)
+
                 user = user_role.user
+
             except UserRole.DoesNotExist:
-                return Response({"error": "Invalid employee ID"}, status=401)
+                return Response(
+                    {"error": "Invalid employee ID"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
 
-            user = authenticate(username=user.username, password=password)
-
-            if not user:
-                return Response({"error": "Invalid credentials"}, status=401)
+            # Validate password
+            if not user.check_password(password):
+                return Response(
+                    {"error": "Invalid credentials"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
 
             # Founder Admin Login
             if user_role.role.name.lower() == "admin":
                 return Response({
                     "message": "Founder Admin login successful",
                     "role": "FOUNDER_ADMIN"
-                }, status=200)
+                }, status=status.HTTP_200_OK)
 
+            # Send OTP
             send_otp_email(user.email, "LOGIN")
 
-            ip = self.get_client_ip(request)
-            device = request.META.get('HTTP_USER_AGENT')
-
+            # Save login log
             LoginLogs.objects.create(
                 user=user,
                 ip_address=ip,
@@ -311,33 +272,59 @@ class LoginView(APIView):
                 "employee_id": employee_id,
                 "email": user.email,
                 "role": user_role.role.name
-            })
+            }, status=status.HTTP_200_OK)
 
+
+        # -------- ADMIN LOGIN --------
+        elif email:
+
+            if not password:
+                return Response(
+                    {"error": "Password required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            admin = WMSAdmin.objects.filter(email=email).first()
+
+            if not admin:
+                return Response(
+                    {"error": "Admin not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            if admin.password != password:
+                return Response(
+                    {"error": "Invalid credentials"},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            # Send OTP
+            send_otp_email(admin.email, "ADMIN_LOGIN")
+
+            return Response({
+                "message": "OTP sent to admin email",
+                "admin_id": admin.admin_id,
+                "email": admin.email,
+                "role": admin.role
+            }, status=status.HTTP_200_OK)
+
+
+        # -------- INVALID REQUEST --------
         return Response(
-            {"error": "Provide email (admin) or employee_id (employee)"},
-            status=400
+            {"error": "Provide employee_id (employee) or email (admin)"},
+            status=status.HTTP_400_BAD_REQUEST
         )
-    
 class VerifyLoginOTPView(APIView):
 
     def post(self, request):
 
-        employee_id = request.data.get("employee_id")
         otp_code = request.data.get("otp")
 
-        if not employee_id or not otp_code:
-            return Response({"error": "employee_id and otp required"}, status=400)
-
-        try:
-            user_role = UserRole.objects.select_related('user').get(employee_id=employee_id)
-            user = user_role.user
-        except UserRole.DoesNotExist:
-            return Response({"error": "Employee not found"}, status=404)
+        if not otp_code:
+            return Response({"error": "OTP is required"}, status=400)
 
         otp = OTP.objects.filter(
-            email=user.email,
             otp_code=otp_code,
-            purpose="LOGIN",
             is_used=False
         ).order_by("-created_at").first()
 
@@ -346,6 +333,31 @@ class VerifyLoginOTPView(APIView):
 
         if otp.is_expired():
             return Response({"error": "OTP expired"}, status=400)
+
+        email = otp.email
+
+        # -------- CHECK ADMIN --------
+        admin = WMSAdmin.objects.filter(email=email).first()
+
+        if admin:
+
+            otp.is_used = True
+            otp.save()
+
+            return Response({
+                "message": "Admin login successful",
+                "admin_id": admin.admin_id,
+                "email": admin.email,
+                "role": admin.role
+            })
+
+        # -------- CHECK EMPLOYEE --------
+        user = User.objects.filter(email=email).first()
+
+        if not user:
+            return Response({"error": "User not found"}, status=404)
+
+        user_role = UserRole.objects.get(user=user)
 
         otp.is_used = True
         otp.save()
@@ -363,9 +375,10 @@ class VerifyLoginOTPView(APIView):
 
         return Response({
             "message": "Login successful",
+            "employee_id": user_role.employee_id,
+            "role": user_role.role.name,
             "force_change_password": user_role.is_first_login
         })
-
 
 class ForceChangePasswordView(APIView):
 
@@ -401,13 +414,13 @@ class ForgotPasswordOTPView(APIView):
 
         email = serializer.validated_data["email"]
 
-        if not User.objects.filter(email=email).exists():
+        if not User.objects.filter(email=email).exists() and not WMSAdmin.objects.filter(email=email).exists():
+
             return Response({"error": "User not found"}, status=404)
 
         send_otp_email(email, "RESET_PASSWORD")
 
         return Response({"message": "OTP sent for password reset"})
-
 
 class ResetPasswordView(APIView):
 
@@ -433,11 +446,32 @@ class ResetPasswordView(APIView):
         if otp.is_expired():
             return Response({"error": "OTP expired"}, status=400)
 
-        user = User.objects.get(email=data["email"])
-        user.set_password(data["new_password"])
-        user.save()
+        email = data["email"]
 
-        otp.is_used = True
-        otp.save()
+        # -------- EMPLOYEE PASSWORD RESET --------
+        user = User.objects.filter(email=email).first()
 
-        return Response({"message": "Password reset successful"})
+        if user:
+            user.set_password(data["new_password"])
+            user.save()
+
+            otp.is_used = True
+            otp.save()
+
+            return Response({"message": "Employee password reset successful"})
+
+
+        # -------- ADMIN PASSWORD RESET --------
+        admin = WMSAdmin.objects.filter(email=email).first()
+
+        if admin:
+            admin.password = data["new_password"]   # if plain text
+            admin.save()
+
+            otp.is_used = True
+            otp.save()
+
+            return Response({"message": "Admin password reset successful"})
+
+
+        return Response({"error": "User not found"}, status=404)

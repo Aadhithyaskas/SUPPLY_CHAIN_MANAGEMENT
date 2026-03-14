@@ -117,6 +117,13 @@ class LoginLogs(models.Model):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
+    # admin = models.ForeignKey(
+    #     "WMSAdmin",
+    #     on_delete=models.CASCADE,
+    #     null=True,
+    #     blank=True
+    # )
+
     login_time = models.DateTimeField(auto_now_add=True)
 
     logout_time = models.DateTimeField(null=True, blank=True)

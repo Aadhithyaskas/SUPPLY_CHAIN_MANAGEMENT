@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum
 
-from .models import Inventory, PurchaseRequest, PurchaseOrder, ASN
-from .serializers import InventorySerializer, PurchaseRequestSerializer, ASNSerializer
+from .models import Inventory, PurchaseRequest, PurchaseOrder, ASN, ASNItem
+from .serializers import InventorySerializer, PurchaseRequestSerializer, ASNSerializer, ASNItemSerializer
 from .utils import check_reorder
 from django.core.mail import send_mail
 
@@ -244,5 +244,50 @@ class ASNDetailView(APIView):
             return Response({"error": "ASN not found"}, status=404)
 
         serializer = ASNSerializer(asn)
+
+        return Response(serializer.data)
+
+
+# Views for ASN Items
+
+class CreateASNItemView(APIView):
+
+    def post(self, request):
+
+        serializer = ASNItemSerializer(data=request.data, many = True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "ASN Item created successfully",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ASNItemListView(APIView):
+
+    def get(self, request):
+
+        items = ASNItem.objects.all()
+        serializer = ASNItemSerializer(items, many=True)
+
+        return Response(serializer.data)
+    
+
+class ASNItemDetailView(APIView):
+
+    def get(self, request, pk):
+
+        try:
+            item = ASNItem.objects.get(asn_item_id=pk)
+        except ASNItem.DoesNotExist:
+            return Response(
+                {"error": "ASN Item not found"},
+                status=404
+            )
+
+        serializer = ASNItemSerializer(item)
 
         return Response(serializer.data)

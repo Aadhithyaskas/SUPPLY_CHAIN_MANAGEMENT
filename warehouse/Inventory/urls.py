@@ -22,4 +22,11 @@ urlpatterns = [
     path('asn-list/', ASNListView.as_view(), name='asn-list'),
 
     path('asn/<int:pk>/', ASNDetailView.as_view(), name='asn-detail'),
+
+    path('create-asn-item/', CreateASNItemView.as_view(), name='create-asn-item'),
+
+    path('asn-item/', ASNItemListView.as_view(), name='asn-items'),
+
+    path('asn-item/<str:pk>/', ASNItemDetailView.as_view(), name='asn-item-detail'),
+
 ]

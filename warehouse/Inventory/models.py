@@ -187,3 +187,45 @@ class ASN(models.Model):
 
     def __str__(self):
         return self.asn_id
+    
+
+class ASNItem(models.Model):
+
+    asn_item_id = models.CharField(
+        max_length=20,
+        primary_key=True,
+        editable=False
+    )
+
+    asn = models.ForeignKey(
+        ASN,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE
+    )
+
+    expected_quantity = models.IntegerField()
+
+    shipped_quantity = models.IntegerField()
+
+    def save(self, *args, **kwargs):
+
+        if not self.asn_item_id:
+            last_item = ASNItem.objects.order_by('-asn_item_id').first()
+
+            if last_item:
+                last_id = int(last_item.asn_item_id.split('-')[-1])
+                new_id = last_id + 1
+            else:
+                new_id = 1
+
+            self.asn_item_id = f"ASN-ITM-{new_id:03d}"
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.asn_item_id

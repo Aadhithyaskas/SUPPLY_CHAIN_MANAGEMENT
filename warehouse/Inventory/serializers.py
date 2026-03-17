@@ -1,6 +1,12 @@
 from rest_framework import serializers
 from .models import Inventory, PurchaseRequest
+from .models import ASN
 
+class ASNSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ASN
+        fields = "__all__"
 
 class InventorySerializer(serializers.ModelSerializer):
 

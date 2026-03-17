@@ -13,8 +13,13 @@ urlpatterns = [
 
     path("purchase-requests/", PurchaseRequestListView.as_view()),
     
-     path("pr/manager-approve/<str:pr_id>/", ManagerApprovePR.as_view()),
+    path("pr/manager-approve/<str:pr_id>/", ManagerApprovePR.as_view()),
 
     path("pr/finance-approve/<str:pr_id>/", FinanceApprovePR.as_view()),
 
+    path('create-asn/', ASNCreateView.as_view(), name='create-asn'),
+
+    path('asn-list/', ASNListView.as_view(), name='asn-list'),
+
+    path('asn/<int:pk>/', ASNDetailView.as_view(), name='asn-detail'),
 ]

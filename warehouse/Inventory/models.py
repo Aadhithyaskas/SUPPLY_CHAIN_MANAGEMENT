@@ -1,5 +1,7 @@
 from django.db import models
 from products.models import Product
+from vendors.models import Vendor
+# from .models import PurchaseOrder
 
 
 class Inventory(models.Model):
@@ -43,6 +45,7 @@ class Inventory(models.Model):
 
     def __str__(self):
         return f"{self.product.product_name} - {self.zone_name}/{self.rack_name}/{self.bin_name}"
+
 class PurchaseRequest(models.Model):
     
     STATUS_CHOICES = [
@@ -128,3 +131,59 @@ class PurchaseOrder(models.Model):
             self.po_id = f"PO{new_id:04d}"
 
         super().save(*args, **kwargs)
+
+
+class ASN(models.Model):
+
+    asn_id = models.CharField(
+        max_length=10,
+        primary_key=True,
+        editable=False
+    )
+
+    po = models.ForeignKey(
+        PurchaseOrder,
+        on_delete=models.CASCADE,
+        related_name="asn_po"
+    )
+
+    asn_number = models.CharField(
+        max_length=50,
+        unique=True   # from vendor
+    )
+
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="asn_vendor"
+    )
+
+    shipment_date = models.DateField()
+
+    expected_arrival_date = models.DateField()
+
+    vehicle_num = models.CharField(max_length=13)
+
+    driver_name = models.CharField(max_length=25)
+
+    driver_phone = models.CharField(max_length=15)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+
+        if not self.asn_id:
+            last_asn = ASN.objects.order_by('-created_at').first()
+
+            if last_asn:
+                last_id = int(last_asn.asn_id[3:])
+                new_id = last_id + 1
+            else:
+                new_id = 1
+
+            self.asn_id = f"ASN{new_id:04d}"
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.asn_id

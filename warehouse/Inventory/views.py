@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum
 
-from .models import Inventory, PurchaseRequest, PurchaseOrder
-from .serializers import InventorySerializer, PurchaseRequestSerializer
+from .models import Inventory, PurchaseRequest, PurchaseOrder, ASN
+from .serializers import InventorySerializer, PurchaseRequestSerializer, ASNSerializer
 from .utils import check_reorder
 from django.core.mail import send_mail
 
@@ -203,3 +203,46 @@ def send_po_email(po):
         [po.vendor.email],
         fail_silently=False
     )
+
+
+class ASNCreateView(APIView):
+
+    def post(self, request):
+
+        serializer = ASNSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "ASN created successfully",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class ASNListView(APIView):
+
+    def get(self, request):
+
+        asn = ASN.objects.all()
+
+        serializer = ASNSerializer(asn, many=True)
+
+        return Response(serializer.data)
+
+
+
+class ASNDetailView(APIView):
+
+    def get(self, request, pk):
+
+        try:
+            asn = ASN.objects.get(asn_id=pk)
+        except ASN.DoesNotExist:
+            return Response({"error": "ASN not found"}, status=404)
+
+        serializer = ASNSerializer(asn)
+
+        return Response(serializer.data)

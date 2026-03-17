@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Inventory, PurchaseRequest
+from .models import Inventory, PurchaseRequest, PurchaseOrder, ASN
 
 
 @admin.register(Inventory)
@@ -63,4 +63,63 @@ class PurchaseRequestAdmin(admin.ModelAdmin):
     readonly_fields = (
         "pr_id",
         "created_at"
+    )
+
+
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "po_id",
+        "pr",
+        "vendor",
+        "order_quantity",
+        "total_amount",
+        "created_at"
+    )
+
+    search_fields = (
+        "po_id",
+        "vendor__vendor_name"
+    )
+
+    list_filter = (
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+    readonly_fields = (
+        "po_id",
+        "created_at"
+    )
+
+
+@admin.register(ASN)
+class ASNAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "asn_number",
+        "po",
+        "vendor",
+        "shipment_date",
+        "expected_arrival_date",
+        "vehicle_num"
+    )
+
+    search_fields = (
+        "asn_number",
+        "po__po_id",
+        "vendor__vendor_name"
+    )
+
+    list_filter = (
+        "shipment_date",
+        "expected_arrival_date"
+    )
+
+    ordering = ("-shipment_date",)
+
+    readonly_fields = (
+        "created_at",
     )

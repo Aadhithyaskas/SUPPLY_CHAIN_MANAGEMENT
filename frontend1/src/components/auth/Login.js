@@ -22,17 +22,25 @@ const Login = () => {
     } else if (!validateEmail(values.email)) {
       errors.email = 'Invalid email format';
     }
+    
     if (loginMode === 'employee' && !validateRequired(values.employeeId)) {
       errors.employeeId = 'Employee ID is required';
     }
+
+    // Added validation for adminId when in admin mode
+    if (loginMode === 'admin' && !validateRequired(values.adminId)) {
+      errors.adminId = 'Admin ID is required';
+    }
+
     if (!validateRequired(values.password)) {
       errors.password = 'Password is required';
     }
     return errors;
   };
 
+  // Added adminId to initial values
   const { values, errors, touched, handleChange, handleBlur, isValid, resetForm } = useForm(
-    { employeeId: '', email: '', password: '' },
+    { employeeId: '', adminId: '', email: '', password: '' },
     validateLogin
   );
 
@@ -53,8 +61,10 @@ const Login = () => {
     setLoading(true);
 
     try {
+      // Included adminId in the login payload
       const result = await login({
         employeeId: loginMode === 'employee' ? values.employeeId : null,
+        adminId: loginMode === 'admin' ? values.adminId : null,
         email: values.email,
         password: values.password
       });
@@ -109,6 +119,8 @@ const Login = () => {
           {error && <Alert type={ALERT_TYPES.ERROR} message={error} onClose={() => setError('')} className="login-alert" />}
           
           <form onSubmit={handleSubmit} className="login-form">
+            
+            {/* Employee ID Input */}
             {loginMode === 'employee' && (
               <div className="input-group">
                 <label className="input-label"><i className="fas fa-id-badge"></i> Employee ID</label>
@@ -125,6 +137,24 @@ const Login = () => {
               </div>
             )}
 
+            {/* Admin ID Input - New Addition */}
+            {loginMode === 'admin' && (
+              <div className="input-group">
+                <label className="input-label"><i className="fas fa-id-badge"></i> Admin ID</label>
+                <input
+                  type="text"
+                  name="adminId"
+                  value={values.adminId}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="e.g. ADM0001"
+                  className={`input-field ${touched.adminId && errors.adminId ? 'input-error' : ''}`}
+                />
+                {touched.adminId && errors.adminId && <div className="error-message">{errors.adminId}</div>}
+              </div>
+            )}
+
+            {/* Email Input */}
             <div className="input-group">
               <label className="input-label">
                 <i className="fas fa-envelope"></i> {loginMode === 'employee' ? 'Work Email' : 'Admin Email'}
@@ -141,6 +171,7 @@ const Login = () => {
               {touched.email && errors.email && <div className="error-message">{errors.email}</div>}
             </div>
 
+            {/* Password Input */}
             <div className="input-group">
               <label className="input-label"><i className="fas fa-lock"></i> Password</label>
               <input

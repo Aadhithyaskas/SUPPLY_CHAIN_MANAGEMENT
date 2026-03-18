@@ -76,67 +76,55 @@ export const AuthProvider = ({ children }) => {
 
   }, []);
 
-  /* -----------------------------
-     LOGIN
-  ------------------------------*/
-  const login = async (credentials) => {
+  // AuthContext.js
 
-    try {
+/* -----------------------------
+    LOGIN
+------------------------------*/
+const login = async (credentials) => {
+  try {
+    // Pass adminId from credentials to the apiLogin service
+    const response = await apiLogin(
+      credentials.employeeId,
+      credentials.email,
+      credentials.password,
+      credentials.adminId // Added this
+    );
 
-      const response = await apiLogin(
-        credentials.employeeId,
-        credentials.email,
-        credentials.password
-      );
+    /* Founder Admin login */
+    if (response.message === "Founder Admin login successful") {
+      const userData = {
+        employeeId: credentials.employeeId,
+        adminId: credentials.adminId, // Store if needed
+        email: credentials.email,
+        role: ROLES.FOUNDER_ADMIN,
+        lastLogin: new Date().toISOString(),
+      };
 
-      /* Founder Admin login */
-      if (response.message === "Founder Admin login successful") {
+      // ... existing logic for Welcome message ...
 
-        const userData = {
-          employeeId: credentials.employeeId,
-          email: credentials.email,
-          role: ROLES.FOUNDER_ADMIN,
-          lastLogin: new Date().toISOString(),
-        };
+      setUser(userData);
+      setIsAuthenticated(true);
+      setIsAdmin(true);
+      setUserData(userData);
 
-        const storedUser = getUserData();
-
-        if (storedUser) {
-
-          setLoginSuccessMessage(
-            `Welcome back! Your last login was on ${new Date(
-              storedUser.lastLogin
-            ).toLocaleString()}`
-          );
-
-          setShowLoginMessage(true);
-        }
-
-        setUser(userData);
-        setIsAuthenticated(true);
-        setIsAdmin(true);
-
-        setUserData(userData);
-
-        return { success: true, isFounderAdmin: true };
-
-      }
-
-      /* Normal employee login → OTP required */
-      setTempUserData({
-        employeeId: response.employee_id,
-        email: response.email,
-        role: response.role,
-      });
-
-      return { success: true, requiresOTP: true };
-
-    } catch (error) {
-
-      return { success: false, error: error.message };
-
+      return { success: true, isFounderAdmin: true };
     }
-  };
+
+    /* Normal employee or Admin with OTP login → OTP required */
+    setTempUserData({
+      employeeId: response.employee_id,
+      adminId: response.admin_id, // Store admin_id from response for OTP step
+      email: response.email,
+      role: response.role,
+    });
+
+    return { success: true, requiresOTP: true };
+
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
 
   /* -----------------------------
      OTP Verification

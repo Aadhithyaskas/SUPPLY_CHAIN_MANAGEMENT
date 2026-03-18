@@ -209,20 +209,18 @@ class LoginView(APIView):
             return x_forwarded_for.split(',')[0]
         return request.META.get('REMOTE_ADDR')
 
-
     def post(self, request):
-
+        # Extract all possible identifiers from request
         email = request.data.get("email")
         password = request.data.get("password")
         employee_id = request.data.get("employee_id")
+        admin_id = request.data.get("admin_id")  # Added this line
 
         ip = self.get_client_ip(request)
         device = request.META.get('HTTP_USER_AGENT')
 
-
         # -------- EMPLOYEE LOGIN --------
         if employee_id:
-
             if not password:
                 return Response(
                     {"error": "Password required"},
@@ -233,30 +231,28 @@ class LoginView(APIView):
                 user_role = UserRole.objects.select_related(
                     'user', 'role'
                 ).get(employee_id=employee_id)
-
                 user = user_role.user
-
             except UserRole.DoesNotExist:
                 return Response(
                     {"error": "Invalid employee ID"},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
-            # Validate password
+            # Validate password (Django's hashed password check)
             if not user.check_password(password):
                 return Response(
                     {"error": "Invalid credentials"},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
-            # Founder Admin Login
+            # Founder Admin Login (Bypasses OTP as per your original logic)
             if user_role.role.name.lower() == "admin":
                 return Response({
                     "message": "Founder Admin login successful",
                     "role": "FOUNDER_ADMIN"
                 }, status=status.HTTP_200_OK)
 
-            # Send OTP
+            # Standard Employee Flow: Send OTP
             send_otp_email(user.email, "LOGIN")
 
             # Save login log
@@ -276,29 +272,40 @@ class LoginView(APIView):
 
 
         # -------- ADMIN LOGIN --------
-        elif email:
-
+        elif admin_id or email:
+            # 1. Validate that ALL required fields for Admin are present
+            missing_fields = []
+            if not admin_id:
+                missing_fields.append("Admin ID")
+            if not email:
+                missing_fields.append("Email")
             if not password:
+                missing_fields.append("Password")
+
+            if missing_fields:
                 return Response(
-                    {"error": "Password required"},
+                    {"error": f"Missing required fields: {', '.join(missing_fields)}"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            admin = WMSAdmin.objects.filter(email=email).first()
+            # 2. Lookup the admin using BOTH email and admin_id
+            admin = WMSAdmin.objects.filter(admin_id=admin_id, email=email).first()
 
+            # 3. If no record matches both criteria
             if not admin:
                 return Response(
-                    {"error": "Admin not found"},
+                    {"error": "Admin not found or ID/Email mismatch"},
                     status=status.HTTP_404_NOT_FOUND
                 )
 
+            # 4. Check the password (Plain text check as per your model)
             if admin.password != password:
                 return Response(
                     {"error": "Invalid credentials"},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
-            # Send OTP
+            # 5. Success Flow: Send OTP
             send_otp_email(admin.email, "ADMIN_LOGIN")
 
             return Response({
@@ -311,7 +318,7 @@ class LoginView(APIView):
 
         # -------- INVALID REQUEST --------
         return Response(
-            {"error": "Provide employee_id (employee) or email (admin)"},
+            {"error": "Provide employee_id (employee) or email and admin_id (admin)"},
             status=status.HTTP_400_BAD_REQUEST
         )
 class VerifyLoginOTPView(APIView):

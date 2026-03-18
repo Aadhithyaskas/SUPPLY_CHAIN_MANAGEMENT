@@ -1,10 +1,13 @@
 import { apiRequest } from './api';
 
-export const login = (employeeId, email, password) =>
+// services/authService.js
+
+export const login = (employeeId, email, password, adminId) => // Added adminId
   apiRequest('/auth/login/', 'POST', {
     employee_id: employeeId,
     email,
     password,
+    admin_id: adminId, // Send to backend
   }, false);
 
 export const verifyOTP = (employeeId, otp) =>
@@ -50,4 +53,6 @@ export const refreshToken = async () => {
   }
   
   return null;
+
+
 };

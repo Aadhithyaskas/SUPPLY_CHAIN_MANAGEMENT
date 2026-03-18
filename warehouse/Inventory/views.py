@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum
 
-from .models import Inventory, PurchaseRequest, PurchaseOrder, ASN, ASNItem
-from .serializers import InventorySerializer, PurchaseRequestSerializer, ASNSerializer, ASNItemSerializer
+from .models import Inventory, PurchaseRequest, PurchaseOrder, ASN, ASNItem, GRN, GRNItem
+from .serializers import InventorySerializer, PurchaseRequestSerializer, ASNSerializer, ASNItemSerializer, GRNSerializer, GRNItemSerializer
 from .utils import check_reorder
 from django.core.mail import send_mail
 
@@ -290,4 +290,81 @@ class ASNItemDetailView(APIView):
 
         serializer = ASNItemSerializer(item)
 
+        return Response(serializer.data)
+
+
+#Views for GRN
+
+# ✅ CREATE GRN
+class GRNCreateView(APIView):
+    def post(self, request):
+        serializer = GRNSerializer(data=request.data, many = True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=400)
+
+
+# ✅ LIST GRN
+class GRNListView(APIView):
+    def get(self, request):
+        grns = GRN.objects.all().order_by("-created_at")
+        serializer = GRNSerializer(grns, many=True)
+        return Response(serializer.data)
+
+
+# ✅ DETAIL GRN
+class GRNDetailView(APIView):
+
+    def get_object(self, pk):
+        try:
+            return GRN.objects.get(pk=pk)
+        except GRN.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        grn = self.get_object(pk)
+        if not grn:
+            return Response({"error": "GRN not found"}, status=404)
+
+        serializer = GRNSerializer(grn)
+        return Response(serializer.data)
+    
+
+#Views for GRN Items
+
+
+# ✅ CREATE
+class GRNItemCreateView(APIView):
+    def post(self, request):
+        serializer = GRNItemSerializer(data=request.data, many = True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=400)
+
+
+# ✅ LIST
+class GRNItemListView(APIView):
+    def get(self, request):
+        items = GRNItem.objects.all()
+        serializer = GRNItemSerializer(items, many=True)
+        return Response(serializer.data)
+
+
+# ✅ DETAIL
+class GRNItemDetailView(APIView):
+
+    def get_object(self, pk):
+        try:
+            return GRNItem.objects.get(pk=pk)
+        except GRNItem.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        item = self.get_object(pk)
+        if not item:
+            return Response({"error": "Not found"}, status=404)
+
+        serializer = GRNItemSerializer(item)
         return Response(serializer.data)

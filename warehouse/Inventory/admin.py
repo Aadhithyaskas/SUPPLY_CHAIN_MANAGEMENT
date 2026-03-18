@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Inventory, PurchaseRequest, PurchaseOrder, ASN, ASNItem
+from .models import Inventory, PurchaseRequest, PurchaseOrder, ASN, ASNItem, GRN, GRNItem
 
 
 @admin.register(Inventory)
@@ -147,3 +147,30 @@ class ASNItemAdmin(admin.ModelAdmin):
         "asn__asn_id",
         "product__product_name"
     )
+
+@admin.register(GRN)
+class GRNAdmin(admin.ModelAdmin):
+    list_display = (
+        "grn_id", 
+        "grn_number", 
+        "po", 
+        "asn", 
+        "receipt_date"
+    )
+    search_fields = ("grn_id", "grn_number")
+    list_filter = ("receipt_date",)
+
+
+@admin.register(GRNItem)
+class GRNItemAdmin(admin.ModelAdmin):
+    list_display = (
+        "grn_item_id",
+        "grn",
+        "product",
+        "expected_quantity",
+        "received_quantity",
+        "accepted_quantity",
+        "rejected_quantity",
+        "qc_status"
+    )
+    list_filter = ("qc_status",)

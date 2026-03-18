@@ -37,7 +37,7 @@ class WMSAdmin(models.Model):
         default="admin"
     )
 
-    email = models.EmailField()
+    email = models.EmailField(unique=True)
 
     password = models.CharField(max_length=255)
 

@@ -1,6 +1,7 @@
 from django.db import models
 from products.models import Product
 from vendors.models import Vendor
+from datetime import date
 # from .models import PurchaseOrder
 
 
@@ -229,3 +230,94 @@ class ASNItem(models.Model):
 
     def __str__(self):
         return self.asn_item_id
+
+
+class GRN(models.Model):
+
+    grn_id = models.CharField(
+        primary_key=True,
+        max_length=10,
+        editable=False
+    )
+
+    grn_number = models.CharField(max_length=50, unique=True)
+
+    po = models.ForeignKey(
+        PurchaseOrder,
+        on_delete=models.CASCADE
+    )
+
+    asn = models.ForeignKey(
+        ASN,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
+    receipt_date = models.DateField()
+    created_at = models.DateField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.grn_id:
+            last = GRN.objects.order_by('-grn_id').first()
+            if last:
+                last_id = int(last.grn_id.replace("GRN", ""))
+                new_id = last_id + 1
+            else:
+                new_id = 1
+            self.grn_id = f"GRN{new_id:04d}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.grn_id
+
+
+
+class GRNItem(models.Model):
+    grn_item_id = models.CharField(
+        primary_key=True,
+        max_length=15,
+        editable=False
+    )
+
+    grn = models.ForeignKey(
+        GRN,   # update app name
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    product = models.ForeignKey(
+        "products.Product",
+        on_delete=models.CASCADE
+    )
+
+    expected_quantity = models.IntegerField()
+    received_quantity = models.IntegerField()
+    accepted_quantity = models.IntegerField()
+    rejected_quantity = models.IntegerField()
+
+    qc_status = models.CharField(
+        max_length=15,
+        choices=[
+            ("Pending", "Pending"),
+            ("Accepted", "Accepted"),
+            ("Rejected", "Rejected")
+        ],
+        default="Pending"
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.grn_item_id:
+            last_item = GRNItem.objects.order_by('-grn_item_id').first()
+            if last_item:
+                last_id = int(last_item.grn_item_id.split("-")[-1])
+                new_id = last_id + 1
+            else:
+                new_id = 1
+
+            self.grn_item_id = f"GRN-ITM-{new_id:04d}"
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.grn_item_id} - {self.product}"

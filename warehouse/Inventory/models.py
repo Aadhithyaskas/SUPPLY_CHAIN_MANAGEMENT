@@ -4,6 +4,7 @@ from vendors.models import Vendor
 from datetime import date
 # from .models import PurchaseOrder
 
+from django.core.exceptions import ValidationError
 
 class Inventory(models.Model):
 
@@ -230,87 +231,95 @@ class ASNItem(models.Model):
 
     def __str__(self):
         return self.asn_item_id
-
-
+ 
 class GRN(models.Model):
+    
+    STATUS_CHOICES = [
+        ("RECEIVED", "Received by Supervisor"),
+        ("QC_PENDING", "QC Pending"),
+        ("COMPLETED", "Completed"),
+    ]
 
-    grn_id = models.CharField(
-        primary_key=True,
-        max_length=10,
-        editable=False
-    )
-
+    grn_id = models.CharField(primary_key=True, max_length=10, editable=False)
     grn_number = models.CharField(max_length=50, unique=True)
 
-    po = models.ForeignKey(
-        PurchaseOrder,
-        on_delete=models.CASCADE
-    )
-
-    asn = models.ForeignKey(
-        ASN,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True
-    )
+    po = models.ForeignKey("PurchaseOrder", on_delete=models.CASCADE)
+    asn = models.ForeignKey("ASN", on_delete=models.CASCADE, null=True, blank=True)
 
     receipt_date = models.DateField()
-    created_at = models.DateField(auto_now_add=True)
+
+    # 👇 Supervisor role
+    received_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="grn_received"
+    )
+
+    # 👇 QC role
+    qc_verified_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="grn_verified"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="RECEIVED"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         if not self.grn_id:
             last = GRN.objects.order_by('-grn_id').first()
             if last:
-                last_id = int(last.grn_id.replace("GRN", ""))
+                last_id = int(last.grn_id.split('-')[-1])
                 new_id = last_id + 1
             else:
                 new_id = 1
-            self.grn_id = f"GRN{new_id:04d}"
+            self.grn_id = f"GRN-{new_id:04d}"
+
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.grn_id
-
-
-
+   
 class GRNItem(models.Model):
+    
     grn_item_id = models.CharField(
         primary_key=True,
         max_length=15,
         editable=False
     )
 
-    grn = models.ForeignKey(
-        GRN,   # update app name
-        on_delete=models.CASCADE,
-        related_name="items"
-    )
+    grn = models.ForeignKey(GRN, on_delete=models.CASCADE, related_name="items")
 
-    product = models.ForeignKey(
-        "products.Product",
-        on_delete=models.CASCADE
-    )
+    product = models.ForeignKey("products.Product", on_delete=models.CASCADE)
 
-    expected_quantity = models.IntegerField()
     received_quantity = models.IntegerField()
-    accepted_quantity = models.IntegerField()
-    rejected_quantity = models.IntegerField()
+    accepted_quantity = models.IntegerField(default=0)
+    rejected_quantity = models.IntegerField(default=0)
 
     qc_status = models.CharField(
         max_length=15,
         choices=[
             ("Pending", "Pending"),
-            ("Accepted", "Accepted"),
-            ("Rejected", "Rejected")
+            ("Completed", "Completed")
         ],
         default="Pending"
     )
-
+    
     def save(self, *args, **kwargs):
+    
+    # ✅ Validation
+        if self.accepted_quantity + self.rejected_quantity > self.received_quantity:
+            raise ValidationError("Accepted + Rejected cannot exceed Received")
+
         if not self.grn_item_id:
-            last_item = GRNItem.objects.order_by('-grn_item_id').first()
-            if last_item:
-                last_id = int(last_item.grn_item_id.split("-")[-1])
+            last = GRNItem.objects.order_by('-grn_item_id').first()
+            if last:
+                last_id = int(last.grn_item_id.split('-')[-1])
                 new_id = last_id + 1
             else:
                 new_id = 1
@@ -318,6 +327,3 @@ class GRNItem(models.Model):
             self.grn_item_id = f"GRN-ITM-{new_id:04d}"
 
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.grn_item_id} - {self.product}"

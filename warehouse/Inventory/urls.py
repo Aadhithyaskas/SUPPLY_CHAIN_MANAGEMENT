@@ -3,50 +3,47 @@ from .views import *
 
 urlpatterns = [
 
+    # ================= INVENTORY =================
     path("create/", CreateInventoryView.as_view()),
-
     path("add-stock/<str:product_id>/", AddStockByProductView.as_view()),
-
     path("remove-stock/<str:product_id>/", RemoveStockByProductView.as_view()),
-
     path("product-stock/<str:product_id>/", ProductStockView.as_view()),
 
+    # ================= PURCHASE =================
     path("purchase-requests/", PurchaseRequestListView.as_view()),
-    
     path("pr/manager-approve/<str:pr_id>/", ManagerApprovePR.as_view()),
-
     path("pr/finance-approve/<str:pr_id>/", FinanceApprovePR.as_view()),
 
-    #ASN APIs
+    # ================= ASN =================
+    path('create-asn/', ASNCreateView.as_view()),
+    path('asn-list/', ASNListView.as_view()),
+    path('asn/<str:pk>/', ASNDetailView.as_view()),   # ✅ FIXED (was int)
+    path('create-asn-item/', CreateASNItemView.as_view()),
 
-    path('create-asn/', ASNCreateView.as_view(), name='create-asn'),
+    # ================= ASN ITEMS =================
+    path('asn-item/', ASNItemListView.as_view()),
+    path('asn-item/<str:pk>/', ASNItemDetailView.as_view()),
 
-    path('asn-list/', ASNListView.as_view(), name='asn-list'),
+    # ================= GRN (IMPORTANT ORDER) =================
 
-    path('asn/<int:pk>/', ASNDetailView.as_view(), name='asn-detail'),
+    # 🔥 SPECIFIC ROUTES FIRST
+    path('grn/supervisor-create/', SupervisorCreateGRN.as_view()),
+    path('grn/qc-approve/<str:grn_id>/', QCApproveGRN.as_view()),
+    path('grn/qc-pending/', GRNQCPendingListView.as_view()),
+    path('grn/my-grns/', SupervisorGRNListView.as_view()),
+    path('grn/<str:grn_id>/items/', GRNItemsByGRNView.as_view()),
+    path('grn/<str:grn_id>/summary/', GRNSummaryView.as_view()),
 
-    path('create-asn-item/', CreateASNItemView.as_view(), name='create-asn-item'),
+    # 🔥 NORMAL ROUTES
+    path('create-grn/', GRNCreateView.as_view()),
+    path('grn-list/', GRNListView.as_view()),
 
-    #ASN Item APIs
+    # 🔥 DYNAMIC LAST (VERY IMPORTANT)
+    path('grn/<str:pk>/', GRNDetailView.as_view()),
 
-    path('asn-item/', ASNItemListView.as_view(), name='asn-items'),
-
-    path('asn-item/<str:pk>/', ASNItemDetailView.as_view(), name='asn-item-detail'),
-
-    #GRN APIs
-
-    path('create-grn/', GRNCreateView.as_view(), name='create-grn'),
-
-    path('grn-list/', GRNListView.as_view(), name='grn-list'),
-
-    path('grn/<str:pk>/', GRNDetailView.as_view(), name='grn-detail'),
-
-    #GRN Item APIs
-
-    path('create-grn-items/', GRNItemCreateView.as_view(), name='create-grn'),
-
-    path('grn-items-list/', GRNItemListView.as_view(), name='grn-list'),
-
-    path('grn-item/<str:pk>/', GRNItemDetailView.as_view(), name='grn-detail'),
-    
+    # ================= GRN ITEMS =================
+    path('create-grn-items/', GRNItemCreateView.as_view()),
+    path('grn-items-list/', GRNItemListView.as_view()),
+    path('grn-item/<str:pk>/', GRNItemDetailView.as_view()),
 ]
+    

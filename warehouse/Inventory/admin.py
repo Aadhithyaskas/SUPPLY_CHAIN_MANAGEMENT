@@ -160,17 +160,23 @@ class GRNAdmin(admin.ModelAdmin):
     search_fields = ("grn_id", "grn_number")
     list_filter = ("receipt_date",)
 
-
 @admin.register(GRNItem)
 class GRNItemAdmin(admin.ModelAdmin):
+
     list_display = (
-        "grn_item_id",
+        "grn_item_id",   # ✅ now valid
         "grn",
         "product",
-        "expected_quantity",
         "received_quantity",
         "accepted_quantity",
         "rejected_quantity",
         "qc_status"
     )
+
     list_filter = ("qc_status",)
+
+    search_fields = (
+        "grn_item_id",
+        "grn__grn_id",
+        "product__product_name"
+    )

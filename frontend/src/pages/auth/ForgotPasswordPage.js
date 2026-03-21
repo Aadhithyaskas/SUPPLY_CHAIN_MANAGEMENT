@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "../../components/ui/input-otp";
 import { Warehouse, ArrowLeft, Loader2, Mail, Lock, CheckCircle } from "lucide-react";
-import { forgotPasswordOTP, resetPassword } from "../../../components/services/apiService";
+import { forgotPasswordOTP, resetPassword } from "../../services/apiService";
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();

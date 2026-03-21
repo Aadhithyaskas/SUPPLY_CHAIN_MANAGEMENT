@@ -1,25 +1,93 @@
-import { AppLayout } from "@/components/AppLayout";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Search, Download } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
-
-const financeData = [
-  { id: "INV-8801", boe: "BOE-5540", amount: 12400.50, duty: 1240.05, gst: 2232.09, status: "paid", date: "2026-03-15" },
-  { id: "INV-8802", boe: "BOE-5541", amount: 8500.00, duty: 850.00, gst: 1530.00, status: "pending", date: "2026-03-18" },
-  { id: "INV-8803", boe: "BOE-5542", amount: 21000.00, duty: 2100.00, gst: 3780.00, status: "overdue", date: "2026-03-10" },
-];
+import { useState, useEffect } from "react";
+import { AppLayout } from "../components/AppLayout";
+import { Card } from "../components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Badge } from "../components/ui/badge";
+import { Search, Download, Loader2 } from "lucide-react";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { useToast } from "../components/ui/use-toast";
+import { listPurchaseRequests, listPurchaseOrders } from "../services/apiService";
 
 export default function FinancePage() {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [financeData, setFinanceData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filtered = financeData.filter(item => 
-    item.id.toLowerCase().includes(search.toLowerCase()) || 
-    item.boe.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    loadFinanceData();
+  }, []);
+
+  const loadFinanceData = async () => {
+    setIsLoading(true);
+    try {
+      const [prs, pos] = await Promise.all([
+        listPurchaseRequests(),
+        listPurchaseOrders(),
+      ]);
+
+      // Combine approved PRs and POs for finance view
+      const approvedPRs = (prs || [])
+        .filter(pr => pr.status === "Approved")
+        .map(pr => ({
+          id: pr.pr_id,
+          type: "PR",
+          amount: pr.total_amount || 0,
+          status: "approved",
+          date: pr.created_at,
+          reference: pr.product?.product_name,
+        }));
+
+      const purchaseOrders = (pos || []).map(po => ({
+        id: po.po_id,
+        type: "PO",
+        amount: po.total_amount || 0,
+        status: "paid",
+        date: po.created_at,
+        reference: po.vendor?.vendor_name,
+      }));
+
+      setFinanceData([...approvedPRs, ...purchaseOrders]);
+    } catch (error) {
+      console.error("Failed to load finance data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load finance data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filtered = financeData.filter(item =>
+    item.id?.toLowerCase().includes(search.toLowerCase()) ||
+    item.reference?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPayable = filtered.reduce((sum, item) => sum + item.amount, 0);
+
+  const exportToCSV = () => {
+    const headers = ["ID", "Type", "Amount", "Status", "Date", "Reference"];
+    const rows = filtered.map(item => [
+      item.id,
+      item.type,
+      item.amount,
+      item.status,
+      item.date ? new Date(item.date).toLocaleDateString() : "",
+      item.reference,
+    ]);
+    const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `finance-report-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Success", description: "Report exported successfully." });
+  };
 
   return (
     <AppLayout title="Finance & Customs Duty">
@@ -27,14 +95,14 @@ export default function FinancePage() {
         <div className="flex items-center justify-between gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search Invoice or BOE..." 
-              className="pl-9 h-9" 
-              value={search} 
-              onChange={(e) => setSearch(e.target.value)} 
+            <Input
+              placeholder="Search by ID or Reference..."
+              className="pl-9 h-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="sm" className="h-9">
+          <Button variant="outline" size="sm" className="h-9" onClick={exportToCSV} disabled={isLoading}>
             <Download className="w-4 h-4 mr-1.5" /> Export Report
           </Button>
         </div>
@@ -43,38 +111,63 @@ export default function FinancePage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="text-xs font-semibold">Invoice ID</TableHead>
-                <TableHead className="text-xs font-semibold">BOE Ref</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Assessable Value</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Duty (BCD+SWS)</TableHead>
-                <TableHead className="text-xs font-semibold text-right">GST (18%)</TableHead>
+                <TableHead className="text-xs font-semibold">ID</TableHead>
+                <TableHead className="text-xs font-semibold">Type</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Amount (₹)</TableHead>
                 <TableHead className="text-xs font-semibold">Status</TableHead>
-                <TableHead className="text-xs font-semibold text-right">Total Payable</TableHead>
+                <TableHead className="text-xs font-semibold">Date</TableHead>
+                <TableHead className="text-xs font-semibold">Reference</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="text-xs font-mono font-medium">{item.id}</TableCell>
-                  <TableCell className="text-xs font-mono text-muted-foreground">{item.boe}</TableCell>
-                  <TableCell className="text-sm text-right tabular-nums">${item.amount.toLocaleString()}</TableCell>
-                  <TableCell className="text-sm text-right text-orange-600">${item.duty.toLocaleString()}</TableCell>
-                  <TableCell className="text-sm text-right text-blue-600">${item.gst.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={item.status === "paid" ? "secondary" : item.status === "overdue" ? "destructive" : "outline"}
-                      className="capitalize text-[10px]"
-                    >
-                      {item.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm font-bold text-right tabular-nums">
-                    ${(item.amount + item.duty + item.gst).toLocaleString()}
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No finance records found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((item) => (
+                  <TableRow key={`${item.type}-${item.id}`}>
+                    <TableCell className="text-xs font-mono font-medium">{item.id}</TableCell>
+                    <TableCell className="text-xs">
+                      <Badge variant="outline" className="text-xs">
+                        {item.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-right tabular-nums font-medium">
+                      ₹{item.amount.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={item.status === "paid" ? "secondary" : "default"}
+                        className="text-xs capitalize"
+                      >
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {item.date ? new Date(item.date).toLocaleDateString() : "-"}
+                    </TableCell>
+                    <TableCell className="text-xs">{item.reference}</TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
+
+          <div className="p-4 border-t bg-muted/30">
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-medium">Total Payable</p>
+              <p className="text-xl font-bold">₹{totalPayable.toLocaleString()}</p>
+            </div>
+          </div>
         </Card>
       </div>
     </AppLayout>

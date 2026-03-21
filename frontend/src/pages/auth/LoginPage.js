@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Warehouse, ArrowRight, Shield, Loader2 } from "lucide-react";
 // Import your service
-import { login } from "../../../components/services/apiService"; 
+import { login } from "../../services/apiService"; 
 
 export default function LoginPage() {
   const navigate = useNavigate();

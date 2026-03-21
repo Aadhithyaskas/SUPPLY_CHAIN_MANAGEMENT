@@ -1,5 +1,5 @@
-import { API_BASE_URL } from '../utils/constants';
-import { getCookie } from '../utils/helpers';
+import { API_BASE_URL } from '../components/utils/constants';
+import { getCookie } from '../components/utils/helpers';
 
 /* ================= CSRF ================= */
 export const ensureCSRF = async () => {
@@ -13,7 +13,6 @@ export const ensureCSRF = async () => {
 
 /* ================= BASE API ================= */
 export const apiRequest = async (endpoint, method = 'GET', data = null) => {
-
   await ensureCSRF();
 
   const csrftoken = getCookie('csrftoken');
@@ -40,19 +39,13 @@ export const apiRequest = async (endpoint, method = 'GET', data = null) => {
     }
 
     return result;
-
   } catch (error) {
     console.error('API Error:', error.message);
     throw error;
   }
 };
 
-
-
-
-
 /* ================= AUTH ================= */
-
 export const login = (employeeId, email, password, adminId) =>
   apiRequest('/auth/login/', 'POST', {
     employee_id: employeeId,
@@ -80,15 +73,9 @@ export const forceChangePassword = (newPassword, confirmPassword) =>
     confirm_password: confirmPassword,
   });
 
-export const logout = () =>
-  apiRequest('/auth/logout/', 'POST');
-
-
-
-
+export const logout = () => apiRequest('/auth/logout/', 'POST');
 
 /* ================= EMPLOYEE ================= */
-
 export const adminCreateUser = (data) =>
   apiRequest('/auth/admin-create-user/', 'POST', data);
 
@@ -101,12 +88,7 @@ export const updateEmployee = (employeeId, data) =>
 export const deleteEmployee = (employeeId) =>
   apiRequest(`/auth/delete-user/${employeeId}/`, 'DELETE');
 
-
-
-
-
 /* ================= SUPPLIER ================= */
-
 export const createSupplier = (data) =>
   apiRequest('/suppliers/create/', 'POST', data);
 
@@ -122,12 +104,13 @@ export const updateSupplier = (id, data) =>
 export const deleteSupplier = (id) =>
   apiRequest(`/suppliers/delete/${id}/`, 'DELETE');
 
+export const restoreSupplier = (id) =>
+  apiRequest(`/suppliers/restore/${id}/`, 'PUT');
 
-
-
+export const listInactiveSuppliers = () =>
+  apiRequest('/suppliers/inactive/', 'GET');
 
 /* ================= VENDOR ================= */
-
 export const createVendor = (data) =>
   apiRequest('/vendors/create/', 'POST', data);
 
@@ -143,12 +126,7 @@ export const updateVendor = (id, data) =>
 export const deleteVendor = (id) =>
   apiRequest(`/vendors/delete/${id}/`, 'DELETE');
 
-
-
-
-
 /* ================= WAREHOUSE ================= */
-
 export const createWarehouse = (data) =>
   apiRequest('/vendors/Warehouse/create/', 'POST', data);
 
@@ -158,12 +136,7 @@ export const updateWarehouse = (data) =>
 export const getWarehouse = () =>
   apiRequest('/vendors/warehouse/', 'GET');
 
-
-
-
-
 /* ================= PRODUCT ================= */
-
 export const createProduct = (data) =>
   apiRequest('/products/create/', 'POST', data);
 
@@ -179,14 +152,15 @@ export const updateProduct = (id, data) =>
 export const deleteProduct = (id) =>
   apiRequest(`/products/delete/${id}/`, 'DELETE');
 
-
-
-
-
 /* ================= INVENTORY ================= */
-
 export const createInventory = (data) =>
   apiRequest('/inventory/create/', 'POST', data);
+
+export const listInventory = () =>
+  apiRequest('/inventory/list/', 'GET');
+
+export const getInventoryLocation = (id) =>
+  apiRequest(`/inventory/${id}/`, 'GET');
 
 export const addStock = (productId, quantity) =>
   apiRequest(`/inventory/add-stock/${productId}/`, 'POST', { quantity });
@@ -197,14 +171,15 @@ export const removeStock = (productId, quantity) =>
 export const getProductStock = (productId) =>
   apiRequest(`/inventory/product-stock/${productId}/`, 'GET');
 
-
-
-
-
 /* ================= PURCHASE ================= */
-
 export const listPurchaseRequests = () =>
   apiRequest('/inventory/purchase-requests/', 'GET');
+
+export const createPurchaseRequest = (data) =>
+  apiRequest('/inventory/purchase-requests/', 'POST', data);
+
+export const getPurchaseRequest = (id) =>
+  apiRequest(`/inventory/purchase-requests/${id}/`, 'GET');
 
 export const managerApprovePR = (prId) =>
   apiRequest(`/inventory/pr/manager-approve/${prId}/`, 'POST');
@@ -212,12 +187,13 @@ export const managerApprovePR = (prId) =>
 export const financeApprovePR = (prId) =>
   apiRequest(`/inventory/pr/finance-approve/${prId}/`, 'POST');
 
+export const listPurchaseOrders = () =>
+  apiRequest('/inventory/purchase-orders/', 'GET');
 
-
-
+export const getPurchaseOrder = (id) =>
+  apiRequest(`/inventory/purchase-orders/${id}/`, 'GET');
 
 /* ================= ASN ================= */
-
 export const createASN = (data) =>
   apiRequest('/inventory/create-asn/', 'POST', data);
 
@@ -226,6 +202,12 @@ export const listASN = () =>
 
 export const getASN = (id) =>
   apiRequest(`/inventory/asn/${id}/`, 'GET');
+
+export const updateASN = (id, data) =>
+  apiRequest(`/inventory/asn/${id}/`, 'PUT', data);
+
+export const deleteASN = (id) =>
+  apiRequest(`/inventory/asn/${id}/`, 'DELETE');
 
 export const createASNItems = (data) =>
   apiRequest('/inventory/create-asn-item/', 'POST', data);
@@ -236,11 +218,9 @@ export const listASNItems = () =>
 export const getASNItem = (id) =>
   apiRequest(`/inventory/asn-item/${id}/`, 'GET');
 
-
-
-
-
 /* ================= GRN ================= */
+export const createGRN = (data) =>
+  apiRequest('/inventory/create-grn/', 'POST', data);
 
 export const createGRNBySupervisor = (data) =>
   apiRequest('/inventory/grn/supervisor-create/', 'POST', data);
@@ -271,3 +251,10 @@ export const getMyGRNs = () =>
 
 export const getGRNSummary = (id) =>
   apiRequest(`/inventory/grn/${id}/summary/`, 'GET');
+
+/* ================= REPORTS ================= */
+export const getInventoryReport = () =>
+  apiRequest('/reports/inventory/', 'GET');
+
+export const getPurchaseReport = (startDate, endDate) =>
+  apiRequest(`/reports/purchases/?start=${startDate}&end=${endDate}`, 'GET');

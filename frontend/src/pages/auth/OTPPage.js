@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "../../components/ui/input-otp";
 import { Warehouse, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 // Import your service
-import { verifyOTP } from "C:\Users\academytraining\Desktop\demo\SUPPLY_CHAIN_MANAGEMENT\frontend\src\components\services\apiService.js";
+import { verifyOTP } from "../../services/apiService";
 
 export default function OTPPage() {
   const navigate = useNavigate();

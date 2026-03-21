@@ -1,109 +1,42 @@
-.App {
-  max-width: 1200px;
+#root {
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 20px;
-  font-family: Arial, sans-serif;
-}
-
-.authentication-system {
-  background-color: #f5f5f5;
-  padding: 20px;
-  border-radius: 8px;
-  min-height: 500px;
-}
-
-h1 {
-  color: #333;
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-h2 {
-  color: #444;
-  margin-bottom: 20px;
-}
-
-form {
-  background-color: white;
-  padding: 20px;
-  border-radius: 8px;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-form div {
-  margin-bottom: 15px;
-}
-
-label {
-  display: block;
-  margin-bottom: 5px;
-  color: #555;
-  font-weight: bold;
-}
-
-input, select {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-button {
-  background-color: #007bff;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  margin: 5px;
-}
-
-button:hover {
-  background-color: #0056b3;
-}
-
-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-.error {
-  color: #dc3545;
-  background-color: #f8d7da;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 15px;
+  padding: 2rem;
   text-align: center;
 }
 
-.success {
-  color: #28a745;
-  background-color: #d4edda;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 15px;
-  text-align: center;
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
-table {
-  background-color: white;
-  margin-top: 20px;
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-th {
-  background-color: #007bff;
-  color: white;
-  padding: 12px;
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
 }
 
-td {
-  padding: 10px;
-  text-align: left;
+.card {
+  padding: 2em;
 }
 
-tr:nth-child(even) {
-  background-color: #f2f2f2;
+.read-the-docs {
+  color: #888;
 }

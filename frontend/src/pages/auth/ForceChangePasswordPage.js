@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Warehouse, Lock, Loader2, AlertCircle } from "lucide-react";
-import { forceChangePassword } from "../../../components/services/apiService";
+import { forceChangePassword } from "../../services/apiService";
 
 export default function ForceChangePasswordPage() {
   const navigate = useNavigate();

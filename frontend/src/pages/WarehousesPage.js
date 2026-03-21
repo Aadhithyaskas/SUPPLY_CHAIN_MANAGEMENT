@@ -1,55 +1,61 @@
-import { useState } from "react";
-import { AppLayout } from "@/components/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-
-const warehouseData = [
-  {
-    name: "Main Warehouse",
-    zones: [
-      { 
-        name: "Zone A - Receiving", 
-        shelves: [
-          { 
-            name: "Shelf 1", 
-            racks: [
-              { name: "Rack 1", bins: [{ name: "Bin 1" }, { name: "Bin 2" }, { name: "Bin 3" }] },
-              { name: "Rack 2", bins: [{ name: "Bin 1" }, { name: "Bin 2" }] },
-              { name: "Rack 3", bins: [{ name: "Bin 1" }, { name: "Bin 2" }, { name: "Bin 3" }, { name: "Bin 4" }] },
-            ]
-          },
-          { name: "Shelf 2", racks: [{ name: "Rack 1", bins: [{ name: "Bin 1" }, { name: "Bin 2" }] }] },
-        ]
-      },
-      { 
-        name: "Zone B - Storage", 
-        shelves: [
-          { 
-            name: "Shelf 1", 
-            racks: [
-              { name: "Rack 1", bins: [{ name: "Bin 1" }, { name: "Bin 2" }, { name: "Bin 3" }] },
-              { name: "Rack 2", bins: [{ name: "Bin 1" }] },
-            ]
-          },
-        ]
-      },
-      { name: "Zone C - Hazmat", shelves: [{ name: "Shelf 1", racks: [{ name: "Rack 1", bins: [{ name: "Bin 1" }] }] }] },
-      { 
-        name: "Zone D - Dispatch", 
-        shelves: [
-          { name: "Shelf 1", racks: [{ name: "Rack 1", bins: [{ name: "Bin 1" }, { name: "Bin 2" }] }] },
-          { name: "Shelf 4", racks: [{ name: "Rack 2", bins: [{ name: "Bin 8" }] }] },
-        ]
-      },
-    ],
-  },
-];
+import { useState, useEffect } from "react";
+import { AppLayout } from "../components/AppLayout";
+import { Card, CardContent } from "../components/ui/card";
+import { ChevronRight, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { useToast } from "../components/ui/use-toast";
+import { getWarehouse } from "../services/apiService";
+import { listInventory } from "../services/apiService";
 
 export default function WarehousesPage() {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [warehouse, setWarehouse] = useState(null);
+  const [inventoryLocations, setInventoryLocations] = useState([]);
   const [path, setPath] = useState({});
 
+  useEffect(() => {
+    loadWarehouseAndInventory();
+  }, []);
+
+  const loadWarehouseAndInventory = async () => {
+    setIsLoading(true);
+    try {
+      const [wh, inventory] = await Promise.all([
+        getWarehouse(),
+        listInventory(),
+      ]);
+      setWarehouse(wh);
+      
+      // Group inventory by zone
+      const zones = {};
+      (inventory || []).forEach(item => {
+        const zone = item.zone_name || "Unknown";
+        if (!zones[zone]) zones[zone] = [];
+        zones[zone].push(item);
+      });
+      
+      const zoneList = Object.keys(zones).map(zone => ({
+        name: zone,
+        items: zones[zone],
+        shelves: [...new Set(zones[zone].map(i => i.shelf_name).filter(Boolean))],
+      }));
+      
+      setInventoryLocations(zoneList);
+    } catch (error) {
+      console.error("Failed to load warehouse data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load warehouse data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const breadcrumbs = [{ label: "Warehouses", onClick: () => setPath({}) }];
+  const { zoneIdx, shelfIdx, rackIdx } = path;
 
   const renderCards = (items, key, nextPathKey, labelKey, subLabelKey, subLabelSuffix) => (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -71,53 +77,50 @@ export default function WarehousesPage() {
   );
 
   let content = null;
-  const { warehouseIdx, zoneIdx, shelfIdx, rackIdx } = path;
 
-  if (warehouseIdx === undefined) {
-    content = renderCards(warehouseData, "wh", "warehouseIdx", "name", "zones", "zones");
+  if (isLoading) {
+    content = (
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  } else if (zoneIdx === undefined) {
+    const zones = inventoryLocations.map(zone => ({
+      name: zone.name,
+      shelves: zone.shelves,
+    }));
+    content = renderCards(zones, "zone", "zoneIdx", "name", "shelves", "shelves");
   } else {
-    const wh = warehouseData[warehouseIdx];
-    breadcrumbs.push({ label: wh.name, onClick: () => setPath({ warehouseIdx }) });
+    const zone = inventoryLocations[zoneIdx];
+    breadcrumbs.push({ label: zone.name, onClick: () => setPath({ warehouseIdx: 0 }) });
 
-    if (zoneIdx === undefined) {
-      content = renderCards(wh.zones, "zone", "zoneIdx", "name", "shelves", "shelves");
+    if (shelfIdx === undefined) {
+      const shelves = zone.shelves.map(shelf => ({ name: shelf, racks: [] }));
+      content = renderCards(shelves, "shelf", "shelfIdx", "name", "racks", "racks");
     } else {
-      const zone = wh.zones[zoneIdx];
-      breadcrumbs.push({ label: zone.name, onClick: () => setPath({ warehouseIdx, zoneIdx }) });
+      const shelf = zone.shelves[shelfIdx];
+      breadcrumbs.push({ label: shelf, onClick: () => setPath({ warehouseIdx: 0, zoneIdx }) });
 
-      if (shelfIdx === undefined) {
-        content = renderCards(zone.shelves, "shelf", "shelfIdx", "name", "racks", "racks");
-      } else {
-        const shelf = zone.shelves[shelfIdx];
-        breadcrumbs.push({ label: shelf.name, onClick: () => setPath({ warehouseIdx, zoneIdx, shelfIdx }) });
-
-        if (rackIdx === undefined) {
-          content = renderCards(shelf.racks, "rack", "rackIdx", "name", "bins", "bins");
-        } else {
-          const rack = shelf.racks[rackIdx];
-          breadcrumbs.push({ label: rack.name, onClick: () => {} });
-
-          content = (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {rack.bins.map((bin, i) => (
-                <Card key={i} className="shadow-sm">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <p className="text-sm font-medium">{bin.name}</p>
-                    <div className="flex gap-1">
-                      <button className="p-1.5 rounded hover:bg-muted transition-colors">
-                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                      </button>
-                      <button className="p-1.5 rounded hover:bg-destructive/10 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          );
-        }
-      }
+      const items = zone.items.filter(item => item.shelf_name === shelf);
+      content = (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {items.map((item, i) => (
+            <Card key={i} className="shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-sm font-medium">{item.product?.product_name || "Empty"}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Bin: {item.bin_name} | Qty: {item.quantity || 0}
+                </p>
+                <div className="flex justify-end gap-1 mt-2">
+                  <button className="p-1 rounded hover:bg-muted transition-colors">
+                    <Pencil className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      );
     }
   }
 
@@ -138,10 +141,20 @@ export default function WarehousesPage() {
               </span>
             ))}
           </nav>
-          <Button size="sm" className="h-9">
-            <Plus className="w-4 h-4 mr-1.5" /> Add
+          <Button size="sm" className="h-9" disabled>
+            <Plus className="w-4 h-4 mr-1.5" /> Add (Coming Soon)
           </Button>
         </div>
+
+        {warehouse && zoneIdx === undefined && (
+          <Card className="bg-muted/30">
+            <CardContent className="p-4">
+              <p className="text-sm font-medium">{warehouse.warehouse_name}</p>
+              <p className="text-xs text-muted-foreground">{warehouse.address}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {content}
       </div>
     </AppLayout>

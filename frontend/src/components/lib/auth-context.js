@@ -52,21 +52,32 @@ export function AuthProvider({ children }) {
     try {
       const response = await verifyOTP(otp);
 
+      // ✅ FIX: Extract real name from response fields
+      // Backend may return: full_name, name, first_name+last_name, username, or employee_id
+      const resolveName = (res) => {
+        if (res.full_name) return res.full_name;
+        if (res.name) return res.name;
+        if (res.first_name || res.last_name)
+          return `${res.first_name || ""} ${res.last_name || ""}`.trim();
+        if (res.username) return res.username;
+        if (res.employee_id) return `Employee ${res.employee_id}`;
+        if (res.admin_id) return `Admin ${res.admin_id}`;
+        return "User";
+      };
+
       const userData = {
         id: response.employee_id || response.admin_id,
-        name: response.employee_id ? "Employee" : "Admin",
+        name: resolveName(response),           // ✅ real name now
         email: response.email,
         role: response.role,
         isFirstLogin: response.force_change_password || false,
       };
 
-      // ✅ Save user
       setUserState(userData);
       sessionStorage.setItem("user", JSON.stringify(userData));
       sessionStorage.setItem("authToken", "authenticated");
       sessionStorage.removeItem("tempLoginData");
 
-      // ✅ IMPORTANT: Redirect after OTP
       if (response.force_change_password) {
         navigate("/auth/force-change-password");
       } else {
@@ -92,7 +103,6 @@ export function AuthProvider({ children }) {
       setUserState(updatedUser);
       sessionStorage.setItem("user", JSON.stringify(updatedUser));
 
-      // ✅ Redirect after password change
       navigate("/dashboard");
 
       return { success: true };
@@ -140,7 +150,6 @@ export function AuthProvider({ children }) {
   );
 }
 
-// Hook
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

@@ -4,20 +4,51 @@ import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, AlertCircle } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { useToast } from "../components/ui/use-toast";
 import { listEmployees, adminCreateUser, updateEmployee, deleteEmployee } from "../services/apiService";
 import { useAuth } from "../components/lib/auth-context";
+
+const toArray = (res, knownKey = null) => {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (knownKey && Array.isArray(res[knownKey])) return res[knownKey];
+  for (const key of ["results", "data", "items"]) {
+    if (Array.isArray(res[key])) return res[key];
+  }
+  return Object.values(res).find(Array.isArray) || [];
+};
+
+const matchesSearch = (value, query) =>
+  String(value ?? "").toLowerCase().includes(query);
+
+// Detect "email already exists" from any Django error message shape
+const isEmailDuplicate = (message = "") => {
+  const m = message.toLowerCase();
+  return (
+    m.includes("email already") ||
+    m.includes("already exists") ||
+    m.includes("email is already") ||
+    m.includes("duplicate") ||
+    m.includes("unique")
+  );
+};
+
+const ROLE_OPTIONS = [
+  { value: "inventory_manager", label: "Inventory Manager" },
+  { value: "quality_assistant", label: "Quality Assistant" },
+  { value: "finance_director",  label: "Finance Director" },
+  { value: "manager",           label: "Manager" },
+  { value: "supervisor",        label: "Supervisor" },
+];
+
+const EMPTY_FORM = { username: "", email: "", f_name: "", l_name: "", role: "" };
 
 export default function UsersPage() {
   const { user } = useAuth();
@@ -29,74 +60,62 @@ export default function UsersPage() {
   const [dialogMode, setDialogMode] = useState("create");
   const [selectedUser, setSelectedUser] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    f_name: "",
-    l_name: "",
-    role: "",
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  // ✅ Per-field inline errors — keyed by field name
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  const roleOptions = [
-    { value: "inventory_manager", label: "Inventory Manager" },
-    { value: "quality_assistant", label: "Quality Assistant" },
-    { value: "finance_director", label: "Finance Director" },
-    { value: "manager", label: "Manager" },
-    { value: "supervisor", label: "Supervisor" },
-  ];
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  useEffect(() => { loadUsers(); }, []);
 
   const loadUsers = async () => {
     setIsLoading(true);
     try {
       const data = await listEmployees();
-      setUsers(data);
+      setUsers(toArray(data, "employees"));
     } catch (error) {
       console.error("Failed to load users:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load users.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to load users.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const clearFieldErrors = () => setFieldErrors({});
+
   const handleOpenCreate = () => {
     setDialogMode("create");
-    setFormData({
-      username: "",
-      email: "",
-      f_name: "",
-      l_name: "",
-      role: "",
-    });
+    setFormData(EMPTY_FORM);
+    clearFieldErrors();
     setSelectedUser(null);
     setDialogOpen(true);
   };
 
-  const handleOpenEdit = (user) => {
-    setSelectedUser(user);
+  const handleOpenEdit = (userItem) => {
+    setSelectedUser(userItem);
     setFormData({
-      username: user.username,
-      email: user.email,
-      f_name: "",
-      l_name: "",
-      role: user.role,
+      username: userItem.username ?? "",
+      email:    userItem.email    ?? "",
+      f_name:   "",
+      l_name:   "",
+      role:     userItem.role     ?? "",
     });
+    clearFieldErrors();
     setDialogMode("edit");
     setDialogOpen(true);
   };
 
-  const handleDelete = async (user) => {
-    if (!window.confirm(`Are you sure you want to delete ${user.username}?`)) return;
+  // Clear field-level error the moment the user edits that field
+  const handleFieldChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const handleDelete = async (userItem) => {
+    if (!window.confirm(`Are you sure you want to delete ${userItem.username}?`)) return;
     setIsSubmitting(true);
     try {
-      await deleteEmployee(user.employee_id);
+      await deleteEmployee(userItem.employee_id);
       toast({ title: "Success", description: "User deleted successfully." });
       loadUsers();
     } catch (error) {
@@ -109,31 +128,42 @@ export default function UsersPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    clearFieldErrors();
     try {
       if (dialogMode === "create") {
         await adminCreateUser(formData);
-        toast({ title: "Success", description: "User created successfully. Password sent to email." });
-      } else if (dialogMode === "edit") {
+        toast({ title: "Success", description: "User created. Password sent to email." });
+      } else {
         await updateEmployee(selectedUser.employee_id, {
           username: formData.username,
-          email: formData.email,
-          role: formData.role,
+          email:    formData.email,
+          role:     formData.role,
         });
         toast({ title: "Success", description: "User updated successfully." });
       }
       setDialogOpen(false);
       loadUsers();
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      const msg = error.message || "";
+
+      if (isEmailDuplicate(msg)) {
+        // ✅ Show inline error under the email field — dialog stays open
+        setFieldErrors({ email: "This email is already registered. Use a different address." });
+      } else {
+        // Unexpected error — generic toast
+        toast({ title: "Error", description: msg || "Operation failed.", variant: "destructive" });
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filteredUsers = users.filter((u) =>
-    u.username?.toLowerCase().includes(search.toLowerCase()) ||
-    u.employee_id?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
+  const q = search.toLowerCase();
+  const filteredUsers = users.filter(
+    (u) =>
+      matchesSearch(u.username,    q) ||
+      matchesSearch(u.employee_id, q) ||
+      matchesSearch(u.email,       q)
   );
 
   if (user?.role !== "admin") {
@@ -197,17 +227,21 @@ export default function UsersPage() {
               ) : (
                 filteredUsers.map((userItem) => (
                   <TableRow key={userItem.employee_id} className="hover:bg-gray-50">
-                    <TableCell className="text-xs font-mono font-medium text-gray-600">{userItem.employee_id}</TableCell>
-                    <TableCell className="text-sm font-medium text-gray-900">{userItem.username}</TableCell>
+                    <TableCell className="text-xs font-mono font-medium text-gray-600">
+                      {userItem.employee_id}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-gray-900">
+                      {userItem.username}
+                    </TableCell>
                     <TableCell className="text-xs text-gray-500">{userItem.email}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs capitalize">
-                        {userItem.role?.replace("_", " ")}
+                        {userItem.role?.replace(/_/g, " ")}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={userItem.is_first_login ? "warning" : "secondary"}
+                        variant={userItem.is_first_login ? "outline" : "secondary"}
                         className="text-xs"
                       >
                         {userItem.is_first_login ? "Pending" : "Completed"}
@@ -215,17 +249,13 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleOpenEdit(userItem)}
-                          className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-                        >
+                        <button onClick={() => handleOpenEdit(userItem)}
+                          className="p-1.5 rounded hover:bg-gray-100 transition-colors" title="Edit">
                           <Pencil className="w-3.5 h-3.5 text-gray-500" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(userItem)}
-                          className="p-1.5 rounded hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-600" />
+                        <button onClick={() => handleDelete(userItem)}
+                          className="p-1.5 rounded hover:bg-red-50 transition-colors" title="Delete">
+                          <Trash2 className="w-3.5 h-3.5 text-gray-500" />
                         </button>
                       </div>
                     </TableCell>
@@ -237,8 +267,11 @@ export default function UsersPage() {
         </div>
       </Card>
 
-      {/* Create/Edit User Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* Create / Edit Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) clearFieldErrors(); }}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <form onSubmit={handleSubmit}>
             <DialogHeader>
@@ -251,59 +284,60 @@ export default function UsersPage() {
             </DialogHeader>
 
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>First Name</Label>
-                  <Input
-                    value={formData.f_name}
-                    onChange={(e) => setFormData({ ...formData, f_name: e.target.value })}
-                    required={dialogMode === "create"}
-                  />
+              {dialogMode === "create" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>First Name *</Label>
+                    <Input value={formData.f_name}
+                      onChange={(e) => handleFieldChange("f_name", e.target.value)} required />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Last Name *</Label>
+                    <Input value={formData.l_name}
+                      onChange={(e) => handleFieldChange("l_name", e.target.value)} required />
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label>Last Name</Label>
-                  <Input
-                    value={formData.l_name}
-                    onChange={(e) => setFormData({ ...formData, l_name: e.target.value })}
-                    required={dialogMode === "create"}
-                  />
-                </div>
-              </div>
+              )}
 
               <div className="grid gap-2">
                 <Label>Username *</Label>
-                <Input
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  required
-                />
+                <Input value={formData.username}
+                  onChange={(e) => handleFieldChange("username", e.target.value)} required />
               </div>
 
+              {/* ✅ Email field with inline duplicate-error indication */}
               <div className="grid gap-2">
                 <Label>Email *</Label>
                 <Input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => handleFieldChange("email", e.target.value)}
                   required
+                  aria-invalid={!!fieldErrors.email}
+                  className={
+                    fieldErrors.email
+                      ? "border-red-500 focus-visible:ring-red-400 bg-red-50"
+                      : ""
+                  }
                 />
+                {fieldErrors.email && (
+                  <p className="flex items-center gap-1.5 text-xs text-red-600">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {fieldErrors.email}
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-2">
                 <Label>Role *</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => setFormData({ ...formData, role: value })}
-                  required
-                >
+                <Select value={formData.role}
+                  onValueChange={(value) => handleFieldChange("role", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {roleOptions.map((role) => (
-                      <SelectItem key={role.value} value={role.value}>
-                        {role.label}
-                      </SelectItem>
+                    {ROLE_OPTIONS.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

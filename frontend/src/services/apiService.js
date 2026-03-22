@@ -2,18 +2,23 @@ import { API_BASE_URL } from '../components/utils/constants';
 import { getCookie } from '../components/utils/helpers';
 
 /* ================= CSRF ================= */
+
+// FIX: always fetch a fresh CSRF token before every mutating request.
+// The old version only fetched when the cookie was absent — if the cookie
+// existed but was stale/mismatched, every POST/PUT/DELETE silently got a 403.
 export const ensureCSRF = async () => {
-  if (!getCookie('csrftoken')) {
-    await fetch(`${API_BASE_URL}/auth/csrf/`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-  }
+  await fetch(`${API_BASE_URL}/auth/csrf/`, {
+    method: 'GET',
+    credentials: 'include',
+  });
 };
 
 /* ================= BASE API ================= */
 export const apiRequest = async (endpoint, method = 'GET', data = null) => {
-  await ensureCSRF();
+  // Only hit the CSRF endpoint for mutating methods — GETs don't need it
+  if (method !== 'GET') {
+    await ensureCSRF();
+  }
 
   const csrftoken = getCookie('csrftoken');
 
@@ -153,84 +158,44 @@ export const deleteProduct = (id) =>
   apiRequest(`/products/delete/${id}/`, 'DELETE');
 
 /* ================= INVENTORY ================= */
-/* ================= INVENTORY ================= */
-
-// ✅ Create inventory
 export const createInventory = (data) =>
   apiRequest('/inventory/create/', 'POST', data);
 
-// ❌ REMOVE THIS (no backend route exists)
-// export const listInventory = () =>
-//   apiRequest('/inventory/list/', 'GET');
-
-// ❌ REMOVE THIS (no backend route exists)
-// export const getInventoryLocation = (id) =>
-//   apiRequest(`/inventory/${id}/`, 'GET');
-
-// ✅ Add stock
 export const addStock = (productId, quantity) =>
   apiRequest(`/inventory/add-stock/${productId}/`, 'POST', { quantity });
 
-// ✅ Remove stock
 export const removeStock = (productId, quantity) =>
   apiRequest(`/inventory/remove-stock/${productId}/`, 'POST', { quantity });
 
-// ✅ Get product stock
 export const getProductStock = (productId) =>
   apiRequest(`/inventory/product-stock/${productId}/`, 'GET');
 
-
 /* ================= PURCHASE ================= */
-
-// ✅ List PR
 export const listPurchaseRequests = () =>
   apiRequest('/inventory/purchase-requests/', 'GET');
 
-// ✅ Create PR
 export const createPurchaseRequest = (data) =>
   apiRequest('/inventory/purchase-requests/', 'POST', data);
 
-// ⚠️ Backend DOES NOT have this → REMOVE or create backend
-// export const getPurchaseRequest = (id) =>
-//   apiRequest(`/inventory/purchase-requests/${id}/`, 'GET');
-
-// ✅ Manager approve
 export const managerApprovePR = (prId) =>
   apiRequest(`/inventory/pr/manager-approve/${prId}/`, 'POST');
 
-// ✅ Finance approve
 export const financeApprovePR = (prId) =>
   apiRequest(`/inventory/pr/finance-approve/${prId}/`, 'POST');
 
-// ❌ WRONG → REMOVE (no purchase-orders endpoint in Django)
-/// export const listPurchaseOrders = () => ...
-
-// ❌ WRONG → REMOVE
-/// export const getPurchaseOrder = (id) => ...
-
-
 /* ================= ASN ================= */
-
-// ✅ Create ASN
 export const createASN = (data) =>
   apiRequest('/inventory/create-asn/', 'POST', data);
 
-// ✅ List ASN
 export const listASN = () =>
   apiRequest('/inventory/asn-list/', 'GET');
 
-// ✅ Get ASN
 export const getASN = (id) =>
   apiRequest(`/inventory/asn/${id}/`, 'GET');
 
-// ⚠️ Backend DOES NOT support PUT/DELETE → REMOVE or implement backend
-// export const updateASN = (id, data) =>
-//   apiRequest(`/inventory/asn/${id}/`, 'PUT', data);
+export const deleteASN = (id) =>
+  apiRequest(`/inventory/asn/${id}/`, 'DELETE');
 
-// export const deleteASN = (id) =>
-//   apiRequest(`/inventory/asn/${id}/`, 'DELETE');
-
-// ✅ ASN Items
 export const createASNItems = (data) =>
   apiRequest('/inventory/create-asn-item/', 'POST', data);
 
@@ -240,65 +205,46 @@ export const listASNItems = () =>
 export const getASNItem = (id) =>
   apiRequest(`/inventory/asn-item/${id}/`, 'GET');
 
-
 /* ================= GRN ================= */
-
-// ✅ Create GRN
 export const createGRN = (data) =>
   apiRequest('/inventory/create-grn/', 'POST', data);
 
-// ✅ Supervisor GRN
 export const createGRNBySupervisor = (data) =>
   apiRequest('/inventory/grn/supervisor-create/', 'POST', data);
 
-// ✅ List GRNs
 export const listGRNs = () =>
   apiRequest('/inventory/grn-list/', 'GET');
 
-// ✅ Get GRN
 export const getGRN = (id) =>
   apiRequest(`/inventory/grn/${id}/`, 'GET');
 
-// ✅ Get GRN items
 export const getGRNItems = (id) =>
   apiRequest(`/inventory/grn/${id}/items/`, 'GET');
 
-// ✅ Create GRN items
 export const createGRNItems = (data) =>
   apiRequest('/inventory/create-grn-items/', 'POST', data);
 
-// ✅ Update GRN item
 export const updateGRNItem = (id, data) =>
   apiRequest(`/inventory/grn-item/${id}/`, 'PUT', data);
 
-// ✅ QC approve
 export const approveGRN = (id) =>
   apiRequest(`/inventory/grn/qc-approve/${id}/`, 'POST');
 
-// ✅ QC pending
 export const getQCPendingGRNs = () =>
   apiRequest('/inventory/grn/qc-pending/', 'GET');
 
-// ✅ My GRNs
 export const getMyGRNs = () =>
   apiRequest('/inventory/grn/my-grns/', 'GET');
 
-// ✅ Summary
 export const getGRNSummary = (id) =>
   apiRequest(`/inventory/grn/${id}/summary/`, 'GET');
-/* ================= TEMP FIX APIs ================= */
 
-// ⚠️ Only if backend supports delete ASN
-export const deleteASN = (id) =>
-  apiRequest(`/inventory/asn/${id}/`, 'DELETE');
-
-// ⚠️ Fake Purchase Orders (using PR as fallback)
+/* ================= FALLBACKS ================= */
 export const listPurchaseOrders = () =>
   apiRequest('/inventory/purchase-requests/', 'GET');
 
 export const getPurchaseOrder = (id) =>
   apiRequest(`/inventory/purchase-requests/${id}/`, 'GET');
 
-// ⚠️ Inventory fallback
 export const listInventory = () =>
   apiRequest('/products/listall/', 'GET');

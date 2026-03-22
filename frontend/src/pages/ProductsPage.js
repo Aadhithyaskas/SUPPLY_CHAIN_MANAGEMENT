@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
-import { AppLayout } from "../components/AppLayout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, Pencil, Trash2, Loader2, Package } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,17 +17,71 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 import { useToast } from "../components/ui/use-toast";
-import { 
-  listProducts, 
-  createProduct, 
-  updateProduct, 
+import {
+  listProducts,
+  createProduct,
+  updateProduct,
   deleteProduct,
   listSuppliers,
   listVendors,
-  getProductStock
+  getProductStock,
 } from "../services/apiService";
 import { useAuth } from "../components/lib/auth-context";
 
+// Normalise any API response to a plain array
+const toArray = (res, knownKey = null) => {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (knownKey && Array.isArray(res[knownKey])) return res[knownKey];
+  for (const key of ["results", "data", "items"]) {
+    if (Array.isArray(res[key])) return res[key];
+  }
+  return Object.values(res).find(Array.isArray) || [];
+};
+
+// Safe search: coerces any value type to string before matching
+const matchesSearch = (value, query) =>
+  String(value ?? "").toLowerCase().includes(query);
+
+const EMPTY_FORM = {
+  product_name: "",
+  brand_name: "",
+  size: "",
+  description: "",
+  category: "",
+  quantity: 0,
+  unit_price: "",
+  re_order: "",
+  vendor_id: "",
+  supplier_id: "",
+  ABC: "A",
+  VED: "V",
+  XYZ: "X",
+};
+
+const ABC_OPTIONS = [
+  { value: "A", label: "A - High Value" },
+  { value: "B", label: "B - Medium Value" },
+  { value: "C", label: "C - Low Value" },
+];
+const VED_OPTIONS = [
+  { value: "V", label: "V - Vital" },
+  { value: "E", label: "E - Essential" },
+  { value: "D", label: "D - Desirable" },
+];
+const XYZ_OPTIONS = [
+  { value: "X", label: "X - High Demand" },
+  { value: "Y", label: "Y - Medium Demand" },
+  { value: "Z", label: "Z - Low Demand" },
+];
+
+const getStockStatus = (stock, reorder) => {
+  if (stock <= 0)       return { label: "Out of Stock", variant: "destructive" };
+  if (stock <= reorder) return { label: "Low Stock",    variant: "warning" };
+  return                       { label: "In Stock",     variant: "secondary" };
+};
+
+// ✅ No <AppLayout> — layout is provided by the router via <Outlet>
 export default function ProductsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -41,39 +94,9 @@ export default function ProductsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [formData, setFormData] = useState({
-    product_name: "",
-    brand_name: "",
-    size: "",
-    description: "",
-    category: "",
-    quantity: 0,
-    unit_price: "",
-    re_order: "",
-    vendor_id: "",
-    supplier_id: "",
-    ABC: "A",
-    VED: "V",
-    XYZ: "X",
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
-  const roleOptions = [
-    { value: "A", label: "A - High Value" },
-    { value: "B", label: "B - Medium Value" },
-    { value: "C", label: "C - Low Value" },
-  ];
-
-  const vedOptions = [
-    { value: "V", label: "V - Vital" },
-    { value: "E", label: "E - Essential" },
-    { value: "D", label: "D - Desirable" },
-  ];
-
-  const xyzOptions = [
-    { value: "X", label: "X - High Demand" },
-    { value: "Y", label: "Y - Medium Demand" },
-    { value: "Z", label: "Z - Low Demand" },
-  ];
+  const canManage = ["admin", "manager", "inventory_manager"].includes(user?.role);
 
   useEffect(() => {
     loadProducts();
@@ -84,11 +107,14 @@ export default function ProductsPage() {
     setIsLoading(true);
     try {
       const data = await listProducts();
+      // ✅ FIX: use toArray so { products: [...] } and bare arrays both work
+      const productList = toArray(data, "products");
+
       const productsWithStock = await Promise.all(
-        (data.products || []).map(async (product) => {
+        productList.map(async (product) => {
           try {
             const stock = await getProductStock(product.product_id);
-            return { ...product, stock: stock.total_stock || 0 };
+            return { ...product, stock: stock?.total_stock ?? 0 };
           } catch {
             return { ...product, stock: 0 };
           }
@@ -109,12 +135,13 @@ export default function ProductsPage() {
 
   const loadSuppliersAndVendors = async () => {
     try {
-      const [suppliersData, vendorsData] = await Promise.all([
+      const [suppliersRes, vendorsRes] = await Promise.allSettled([
         listSuppliers(),
         listVendors(),
       ]);
-      setSuppliers(suppliersData);
-      setVendors(vendorsData);
+      // ✅ FIX: normalise both responses — they may be envelope objects
+      setSuppliers(suppliersRes.status === "fulfilled" ? toArray(suppliersRes.value, "suppliers") : []);
+      setVendors(vendorsRes.status   === "fulfilled" ? toArray(vendorsRes.value,   "vendors")   : []);
     } catch (error) {
       console.error("Failed to load suppliers/vendors:", error);
     }
@@ -122,21 +149,7 @@ export default function ProductsPage() {
 
   const handleOpenCreate = () => {
     setDialogMode("create");
-    setFormData({
-      product_name: "",
-      brand_name: "",
-      size: "",
-      description: "",
-      category: "",
-      quantity: 0,
-      unit_price: "",
-      re_order: "",
-      vendor_id: "",
-      supplier_id: "",
-      ABC: "A",
-      VED: "V",
-      XYZ: "X",
-    });
+    setFormData(EMPTY_FORM);
     setSelectedProduct(null);
     setDialogOpen(true);
   };
@@ -144,16 +157,17 @@ export default function ProductsPage() {
   const handleOpenEdit = (product) => {
     setSelectedProduct(product);
     setFormData({
-      product_name: product.product_name,
-      brand_name: product.brand_name,
-      size: product.size || "",
-      description: product.description || "",
-      category: product.category,
-      quantity: product.quantity || 0,
-      unit_price: product.unit_price,
-      re_order: product.re_order,
-      vendor_id: product.vendor?.vendor_id || "",
-      supplier_id: product.supplier?.supplier_id || "",
+      product_name: product.product_name   ?? "",
+      brand_name:   product.brand_name     ?? "",
+      size:         product.size           ?? "",
+      description:  product.description    ?? "",
+      category:     product.category       ?? "",
+      quantity:     product.quantity       ?? 0,
+      unit_price:   product.unit_price     ?? "",
+      re_order:     product.re_order       ?? "",
+      // ✅ FIX: coerce IDs to string for shadcn <Select> controlled value matching
+      vendor_id:    String(product.vendor?.vendor_id     ?? ""),
+      supplier_id:  String(product.supplier?.supplier_id ?? ""),
       ABC: product.ABC || "A",
       VED: product.VED || "V",
       XYZ: product.XYZ || "X",
@@ -183,10 +197,9 @@ export default function ProductsPage() {
       const productData = {
         ...formData,
         unit_price: parseInt(formData.unit_price),
-        re_order: parseInt(formData.re_order),
-        quantity: parseInt(formData.quantity) || 0,
+        re_order:   parseInt(formData.re_order),
+        quantity:   parseInt(formData.quantity) || 0,
       };
-
       if (dialogMode === "create") {
         await createProduct(productData);
         toast({ title: "Success", description: "Product created successfully." });
@@ -203,133 +216,123 @@ export default function ProductsPage() {
     }
   };
 
-  const filteredProducts = products.filter((p) =>
-    p.product_name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku_code?.toLowerCase().includes(search.toLowerCase()) ||
-    p.product_id?.toLowerCase().includes(search.toLowerCase())
+  const q = search.toLowerCase();
+  // ✅ FIX: product_id / sku_code may be integers — use matchesSearch for safe coercion
+  const filteredProducts = products.filter(
+    (p) =>
+      matchesSearch(p.product_name, q) ||
+      matchesSearch(p.sku_code,     q) ||
+      matchesSearch(p.product_id,   q)
   );
 
-  const getStockStatus = (stock, reorder) => {
-    if (stock <= 0) return { label: "Out of Stock", variant: "destructive" };
-    if (stock <= reorder) return { label: "Low Stock", variant: "warning" };
-    return { label: "In Stock", variant: "secondary" };
-  };
-
-  // Check if user has permission (admin, manager, inventory_manager)
-  const canManage = ["admin", "manager", "inventory_manager"].includes(user?.role);
-
   return (
-    <AppLayout title="Products">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Search by name, SKU, or ID..."
-              className="pl-9 h-9 border-gray-200"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          {canManage && (
-            <Button size="sm" className="h-9 bg-[#1E3A8A] hover:bg-[#1E293B]" onClick={handleOpenCreate}>
-              <Plus className="w-4 h-4 mr-1.5" /> Add Product
-            </Button>
-          )}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search by name, SKU, or ID..."
+            className="pl-9 h-9 border-gray-200"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-
-        <Card className="shadow-sm border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead className="text-xs font-semibold text-gray-600">Product ID</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600">SKU</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600">Product Name</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600">Category</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600 text-right">Stock</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600 text-right">Unit Price</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600">Status</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#1E3A8A]" />
-                    </TableCell>
-                  </TableRow>
-                ) : filteredProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      No products found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProducts.map((product) => {
-                    const stockStatus = getStockStatus(product.stock, product.re_order);
-                    return (
-                      <TableRow key={product.product_id} className="hover:bg-gray-50">
-                        <TableCell className="text-xs font-mono font-medium text-gray-600">
-                          {product.product_id}
-                        </TableCell>
-                        <TableCell className="text-xs font-mono text-gray-500">
-                          {product.sku_code}
-                        </TableCell>
-                        <TableCell className="text-sm font-medium text-gray-900">
-                          {product.product_name}
-                        </TableCell>
-                        <TableCell className="text-xs text-gray-500">
-                          {product.category}
-                        </TableCell>
-                        <TableCell className={`text-sm text-right tabular-nums font-medium ${
-                          stockStatus.variant === "destructive" || stockStatus.variant === "warning" 
-                            ? "text-red-600" 
-                            : "text-gray-700"
-                        }`}>
-                          {product.stock?.toLocaleString() || 0}
-                        </TableCell>
-                        <TableCell className="text-sm text-right tabular-nums text-gray-700">
-                          ₹{product.unit_price?.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={stockStatus.variant === "warning" ? "destructive" : stockStatus.variant}
-                            className="text-xs"
-                          >
-                            {stockStatus.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {canManage && (
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => handleOpenEdit(product)}
-                                className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-                              >
-                                <Pencil className="w-3.5 h-3.5 text-gray-500" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(product)}
-                                className="p-1.5 rounded hover:bg-red-50 transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-600" />
-                              </button>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+        {canManage && (
+          <Button size="sm" className="h-9 bg-[#1E3A8A] hover:bg-[#1E293B]" onClick={handleOpenCreate}>
+            <Plus className="w-4 h-4 mr-1.5" /> Add Product
+          </Button>
+        )}
       </div>
 
-      {/* Create/Edit Product Dialog */}
+      <Card className="shadow-sm border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead className="text-xs font-semibold text-gray-600">Product ID</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">SKU</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">Product Name</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">Category</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Stock</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Unit Price</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">Status</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#1E3A8A]" />
+                  </TableCell>
+                </TableRow>
+              ) : filteredProducts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    No products found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredProducts.map((product) => {
+                  const stockStatus = getStockStatus(product.stock, product.re_order);
+                  return (
+                    <TableRow key={product.product_id} className="hover:bg-gray-50">
+                      <TableCell className="text-xs font-mono font-medium text-gray-600">
+                        {product.product_id}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-gray-500">
+                        {product.sku_code}
+                      </TableCell>
+                      <TableCell className="text-sm font-medium text-gray-900">
+                        {product.product_name}
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-500">
+                        {product.category}
+                      </TableCell>
+                      <TableCell className={`text-sm text-right tabular-nums font-medium ${
+                        stockStatus.variant !== "secondary" ? "text-red-600" : "text-gray-700"
+                      }`}>
+                        {(product.stock ?? 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-sm text-right tabular-nums text-gray-700">
+                        ₹{(product.unit_price ?? 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={stockStatus.variant === "warning" ? "destructive" : stockStatus.variant}
+                          className="text-xs"
+                        >
+                          {stockStatus.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {canManage && (
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleOpenEdit(product)}
+                              className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(product)}
+                              className="p-1.5 rounded hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-red-600" />
+                            </button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmit}>
@@ -347,104 +350,66 @@ export default function ProductsPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Product Name *</Label>
-                  <Input
-                    value={formData.product_name}
-                    onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                    required
-                    className="border-gray-200"
-                  />
+                  <Label>Product Name *</Label>
+                  <Input value={formData.product_name} className="border-gray-200"
+                    onChange={(e) => setFormData({ ...formData, product_name: e.target.value })} required />
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Brand *</Label>
-                  <Input
-                    value={formData.brand_name}
-                    onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })}
-                    required
-                    className="border-gray-200"
-                  />
+                  <Label>Brand *</Label>
+                  <Input value={formData.brand_name} className="border-gray-200"
+                    onChange={(e) => setFormData({ ...formData, brand_name: e.target.value })} required />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Size</Label>
-                  <Input
-                    value={formData.size}
-                    onChange={(e) => setFormData({ ...formData, size: e.target.value })}
-                    placeholder="e.g., M, L, XL, 10mm"
-                    className="border-gray-200"
-                  />
+                  <Label>Size</Label>
+                  <Input value={formData.size} placeholder="e.g., M, L, XL, 10mm" className="border-gray-200"
+                    onChange={(e) => setFormData({ ...formData, size: e.target.value })} />
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Category *</Label>
-                  <Input
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    required
-                    className="border-gray-200"
-                  />
+                  <Label>Category *</Label>
+                  <Input value={formData.category} className="border-gray-200"
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })} required />
                 </div>
               </div>
 
               <div className="grid gap-2">
-                <Label className="text-sm font-medium text-gray-700">Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  className="border-gray-200"
-                />
+                <Label>Description</Label>
+                <Textarea value={formData.description} rows={3} className="border-gray-200"
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Initial Quantity</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
-                    className="border-gray-200"
-                  />
+                  <Label>Initial Quantity</Label>
+                  <Input type="number" min="0" value={formData.quantity} className="border-gray-200"
+                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })} />
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Unit Price (₹) *</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.unit_price}
-                    onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                    required
-                    className="border-gray-200"
-                  />
+                  <Label>Unit Price (₹) *</Label>
+                  <Input type="number" min="0" value={formData.unit_price} className="border-gray-200"
+                    onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })} required />
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Reorder Level *</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.re_order}
-                    onChange={(e) => setFormData({ ...formData, re_order: e.target.value })}
-                    required
-                    className="border-gray-200"
-                  />
+                  <Label>Reorder Level *</Label>
+                  <Input type="number" min="0" value={formData.re_order} className="border-gray-200"
+                    onChange={(e) => setFormData({ ...formData, re_order: e.target.value })} required />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Supplier</Label>
-                  <Select
-                    value={formData.supplier_id}
-                    onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}
-                  >
+                  <Label>Supplier</Label>
+                  <Select value={formData.supplier_id}
+                    onValueChange={(v) => setFormData({ ...formData, supplier_id: v })}>
                     <SelectTrigger className="border-gray-200">
                       <SelectValue placeholder="Select supplier" />
                     </SelectTrigger>
                     <SelectContent>
                       {suppliers.map((s) => (
-                        <SelectItem key={s.supplier_id} value={s.supplier_id}>
+                        // ✅ FIX: value must be a string for shadcn Select to match correctly
+                        <SelectItem key={s.supplier_id} value={String(s.supplier_id)}>
                           {s.supplier_name}
                         </SelectItem>
                       ))}
@@ -452,17 +417,16 @@ export default function ProductsPage() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Vendor</Label>
-                  <Select
-                    value={formData.vendor_id}
-                    onValueChange={(value) => setFormData({ ...formData, vendor_id: value })}
-                  >
+                  <Label>Vendor</Label>
+                  <Select value={formData.vendor_id}
+                    onValueChange={(v) => setFormData({ ...formData, vendor_id: v })}>
                     <SelectTrigger className="border-gray-200">
                       <SelectValue placeholder="Select vendor" />
                     </SelectTrigger>
                     <SelectContent>
                       {vendors.map((v) => (
-                        <SelectItem key={v.vendor_id} value={v.vendor_id}>
+                        // ✅ FIX: same string coercion for vendor_id
+                        <SelectItem key={v.vendor_id} value={String(v.vendor_id)}>
                           {v.vendor_name}
                         </SelectItem>
                       ))}
@@ -473,56 +437,29 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">ABC Classification</Label>
-                  <Select
-                    value={formData.ABC}
-                    onValueChange={(value) => setFormData({ ...formData, ABC: value })}
-                  >
-                    <SelectTrigger className="border-gray-200">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Label>ABC Classification</Label>
+                  <Select value={formData.ABC} onValueChange={(v) => setFormData({ ...formData, ABC: v })}>
+                    <SelectTrigger className="border-gray-200"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {roleOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
+                      {ABC_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">VED Classification</Label>
-                  <Select
-                    value={formData.VED}
-                    onValueChange={(value) => setFormData({ ...formData, VED: value })}
-                  >
-                    <SelectTrigger className="border-gray-200">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Label>VED Classification</Label>
+                  <Select value={formData.VED} onValueChange={(v) => setFormData({ ...formData, VED: v })}>
+                    <SelectTrigger className="border-gray-200"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {vedOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
+                      {VED_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-sm font-medium text-gray-700">XYZ Classification</Label>
-                  <Select
-                    value={formData.XYZ}
-                    onValueChange={(value) => setFormData({ ...formData, XYZ: value })}
-                  >
-                    <SelectTrigger className="border-gray-200">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Label>XYZ Classification</Label>
+                  <Select value={formData.XYZ} onValueChange={(v) => setFormData({ ...formData, XYZ: v })}>
+                    <SelectTrigger className="border-gray-200"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {xyzOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
+                      {XYZ_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -541,6 +478,6 @@ export default function ProductsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </div>
   );
 }

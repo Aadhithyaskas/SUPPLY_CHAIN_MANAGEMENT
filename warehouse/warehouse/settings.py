@@ -1,30 +1,14 @@
+# settings.py
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-
-
-
-# settings.py
-from datetime import timedelta
-
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': (
-#         'rest_framework_simplejwt.authentication.JWTAuthentication',
-#     ),
-# }
-
-
-
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-replace-this-with-a-random-string'
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", "192.168.1.10"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -35,20 +19,15 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'vendors',
     'supplier',
-    "corsheaders",
-    "products",
-    "Inventory",
-    # Third Party
-    # 'rest_framework',
-   
-
-    # Your App
-    'rbac.apps.RbacConfig' # Using the Config class ensures signals load
+    'corsheaders',
+    'products',
+    'Inventory',
+    'rbac.apps.RbacConfig',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    "corsheaders.middleware.CorsMiddleware",
+    'corsheaders.middleware.CorsMiddleware',   # ← must be BEFORE CommonMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -77,8 +56,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'warehouse.wsgi.application'
 
-
-# Database - Defaulting to SQLite for recovery
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -86,7 +63,6 @@ DATABASES = {
     }
 }
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -94,28 +70,39 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# ─── CORS ────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://192.168.1.10:3000",
 ]
+CORS_ALLOW_CREDENTIALS = True          # required — sends cookies cross-origin
 
-CORS_ALLOW_CREDENTIALS = True
+# ─── CSRF ────────────────────────────────────────────────────────────────────
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
-    "http://192.168.1.10:3000"
+    "http://192.168.1.10:3000",
 ]
 
+# FIX 1: 'Lax' (the default) blocks the cookie on cross-origin POST.
+# 'None' allows it. Requires CSRF_COOKIE_SECURE=False for http in dev.
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = False             # set True in production (https only)
+CSRF_COOKIE_HTTPONLY = False           # must be False so JS can read it
 
-# Internationalization
+# FIX 2: Session cookie must also travel cross-origin on POST requests
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = False          # set True in production
+
+# ─── i18n ────────────────────────────────────────────────────────────────────
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
+# ─── Email ───────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
@@ -123,16 +110,3 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'ganuu1121@gmail.com'
 EMAIL_HOST_PASSWORD = 'jzbk opmk rabh ivax'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
-# REST Framework Settings
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': [
-#         'rest_framework.authentication.SessionAuthentication',
-#     ],
-# }
-ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", "192.168.1.10"]
-
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000"
-]

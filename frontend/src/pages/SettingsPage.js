@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AppLayout } from "../components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -9,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "../components/ui/use-toast";
 import { getWarehouse, updateWarehouse } from "../services/apiService";
 
+// ✅ No <AppLayout> — layout is provided by the router via <Outlet>
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -19,7 +19,6 @@ export default function SettingsPage() {
     warehouse_phone: "",
     address: "",
   });
-
   const [notifications, setNotifications] = useState({
     lowStock: true,
     asnArrival: true,
@@ -35,10 +34,10 @@ export default function SettingsPage() {
     try {
       const data = await getWarehouse();
       setWarehouse({
-        warehouse_name: data.warehouse_name || "",
-        warehouse_email: data.warehouse_email || "",
-        warehouse_phone: data.warehouse_phone || "",
-        address: data.address || "",
+        warehouse_name:  data?.warehouse_name  ?? "",
+        warehouse_email: data?.warehouse_email ?? "",
+        warehouse_phone: data?.warehouse_phone ?? "",
+        address:         data?.address         ?? "",
       });
     } catch (error) {
       console.error("Failed to load warehouse:", error);
@@ -66,112 +65,107 @@ export default function SettingsPage() {
   };
 
   const handleNotificationChange = (key) => {
-    setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+    setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
     toast({ title: "Saved", description: `${key} notification preference updated.` });
   };
 
+  // ✅ FIX: loading spinner no longer wrapped in <AppLayout>
   if (isLoading) {
     return (
-      <AppLayout title="Settings">
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
-      </AppLayout>
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
     );
   }
 
   return (
-    <AppLayout title="Settings">
-      <div className="space-y-4 max-w-2xl">
-        <form onSubmit={handleWarehouseUpdate}>
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Warehouse Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Warehouse Name</Label>
-                <Input
-                  value={warehouse.warehouse_name}
-                  onChange={(e) => setWarehouse({ ...warehouse, warehouse_name: e.target.value })}
-                  className="h-9"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Warehouse Email</Label>
-                <Input
-                  type="email"
-                  value={warehouse.warehouse_email}
-                  onChange={(e) => setWarehouse({ ...warehouse, warehouse_email: e.target.value })}
-                  className="h-9"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Warehouse Phone</Label>
-                <Input
-                  value={warehouse.warehouse_phone}
-                  onChange={(e) => setWarehouse({ ...warehouse, warehouse_phone: e.target.value })}
-                  className="h-9"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Address</Label>
-                <textarea
-                  value={warehouse.address}
-                  onChange={(e) => setWarehouse({ ...warehouse, address: e.target.value })}
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  required
-                />
-              </div>
-              <Button size="sm" type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Save Warehouse
-              </Button>
-            </CardContent>
-          </Card>
-        </form>
-
+    <div className="space-y-4 max-w-2xl">
+      <form onSubmit={handleWarehouseUpdate}>
         <Card className="shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Notifications</CardTitle>
+            <CardTitle className="text-sm">Warehouse Settings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Low Stock Alerts</p>
-                <p className="text-xs text-muted-foreground">Get notified when items hit reorder level</p>
-              </div>
-              <Switch
-                checked={notifications.lowStock}
-                onCheckedChange={() => handleNotificationChange("lowStock")}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Warehouse Name</Label>
+              <Input
+                value={warehouse.warehouse_name}
+                onChange={(e) => setWarehouse({ ...warehouse, warehouse_name: e.target.value })}
+                className="h-9"
+                required
               />
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">ASN Arrival Alerts</p>
-                <p className="text-xs text-muted-foreground">Notify when shipments arrive</p>
-              </div>
-              <Switch
-                checked={notifications.asnArrival}
-                onCheckedChange={() => handleNotificationChange("asnArrival")}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Warehouse Email</Label>
+              <Input
+                type="email"
+                value={warehouse.warehouse_email}
+                onChange={(e) => setWarehouse({ ...warehouse, warehouse_email: e.target.value })}
+                className="h-9"
+                required
               />
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">PR Approval Required</p>
-                <p className="text-xs text-muted-foreground">Alert for pending purchase approvals</p>
-              </div>
-              <Switch
-                checked={notifications.prApproval}
-                onCheckedChange={() => handleNotificationChange("prApproval")}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Warehouse Phone</Label>
+              <Input
+                value={warehouse.warehouse_phone}
+                onChange={(e) => setWarehouse({ ...warehouse, warehouse_phone: e.target.value })}
+                className="h-9"
+                required
               />
             </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Address</Label>
+              <textarea
+                value={warehouse.address}
+                onChange={(e) => setWarehouse({ ...warehouse, address: e.target.value })}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                required
+              />
+            </div>
+            <Button size="sm" type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Warehouse
+            </Button>
           </CardContent>
         </Card>
-      </div>
-    </AppLayout>
+      </form>
+
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Notifications</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            {
+              key: "lowStock",
+              title: "Low Stock Alerts",
+              description: "Get notified when items hit reorder level",
+            },
+            {
+              key: "asnArrival",
+              title: "ASN Arrival Alerts",
+              description: "Notify when shipments arrive",
+            },
+            {
+              key: "prApproval",
+              title: "PR Approval Required",
+              description: "Alert for pending purchase approvals",
+            },
+          ].map(({ key, title, description }) => (
+            <div key={key} className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">{title}</p>
+                <p className="text-xs text-muted-foreground">{description}</p>
+              </div>
+              <Switch
+                checked={notifications[key]}
+                onCheckedChange={() => handleNotificationChange(key)}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

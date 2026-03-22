@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
-import { AppLayout } from "../components/AppLayout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, Pencil, Trash2, RotateCcw, Loader2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,24 +24,42 @@ import {
 } from "../services/apiService";
 import { useToast } from "../components/ui/use-toast";
 
+// Normalise any API response to a plain array
+const toArray = (res, knownKey = null) => {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (knownKey && Array.isArray(res[knownKey])) return res[knownKey];
+  for (const key of ["results", "data", "items"]) {
+    if (Array.isArray(res[key])) return res[key];
+  }
+  return Object.values(res).find(Array.isArray) || [];
+};
+
+// Safe search: coerces any value type to string before matching
+const matchesSearch = (value, query) =>
+  String(value ?? "").toLowerCase().includes(query);
+
+const EMPTY_FORM = {
+  supplier_name: "",
+  contact_personname: "",
+  email: "",
+  phone: "",
+  address: "",
+  city: "",
+  state: "",
+  country: "",
+};
+
+// ✅ No <AppLayout> — layout is provided by the router via <Outlet>
 export default function SuppliersPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [suppliers, setSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState("create"); // create, edit, delete
+  const [dialogMode, setDialogMode] = useState("create"); // create | edit | delete
   const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const [formData, setFormData] = useState({
-    supplier_name: "",
-    contact_personname: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    state: "",
-    country: "",
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -53,7 +70,8 @@ export default function SuppliersPage() {
     setIsLoading(true);
     try {
       const data = await listSuppliers();
-      setSuppliers(data);
+      // ✅ FIX: API may return { suppliers: [...] } or { results: [...] } — not a bare array
+      setSuppliers(toArray(data, "suppliers"));
     } catch (error) {
       console.error("Failed to load suppliers:", error);
       toast({
@@ -68,16 +86,7 @@ export default function SuppliersPage() {
 
   const handleOpenCreate = () => {
     setDialogMode("create");
-    setFormData({
-      supplier_name: "",
-      contact_personname: "",
-      email: "",
-      phone: "",
-      address: "",
-      city: "",
-      state: "",
-      country: "",
-    });
+    setFormData(EMPTY_FORM);
     setSelectedSupplier(null);
     setDialogOpen(true);
   };
@@ -88,14 +97,14 @@ export default function SuppliersPage() {
       const supplier = await getSupplier(supplierId);
       setSelectedSupplier(supplier);
       setFormData({
-        supplier_name: supplier.supplier_name,
-        contact_personname: supplier.contact_personname || "",
-        email: supplier.email || "",
-        phone: supplier.phone || "",
-        address: supplier.address || "",
-        city: supplier.city,
-        state: supplier.state,
-        country: supplier.country,
+        supplier_name:     supplier.supplier_name ?? "",
+        contact_personname: supplier.contact_personname ?? "",
+        email:   supplier.email   ?? "",
+        phone:   supplier.phone   ?? "",
+        address: supplier.address ?? "",
+        city:    supplier.city    ?? "",
+        state:   supplier.state   ?? "",
+        country: supplier.country ?? "",
       });
       setDialogMode("edit");
       setDialogOpen(true);
@@ -123,30 +132,19 @@ export default function SuppliersPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setIsSubmitting(true);
-
     try {
       if (dialogMode === "create") {
         await createSupplier(formData);
-        toast({
-          title: "Success",
-          description: "Supplier created successfully.",
-        });
+        toast({ title: "Success", description: "Supplier created successfully." });
       } else if (dialogMode === "edit") {
         await updateSupplier(selectedSupplier.supplier_id, formData);
-        toast({
-          title: "Success",
-          description: "Supplier updated successfully.",
-        });
+        toast({ title: "Success", description: "Supplier updated successfully." });
       } else if (dialogMode === "delete") {
         await deleteSupplier(selectedSupplier.supplier_id);
-        toast({
-          title: "Success",
-          description: "Supplier deleted successfully.",
-        });
+        toast({ title: "Success", description: "Supplier deleted successfully." });
       }
-
       setDialogOpen(false);
       loadSuppliers();
     } catch (error) {
@@ -161,106 +159,109 @@ export default function SuppliersPage() {
     }
   };
 
+  const q = search.toLowerCase();
+  // ✅ FIX: supplier_id is an integer from Django — coerce safely instead of calling .toLowerCase()
   const filteredSuppliers = suppliers.filter(
     (s) =>
-      s.supplier_name?.toLowerCase().includes(search.toLowerCase()) ||
-      s.supplier_id?.toLowerCase().includes(search.toLowerCase())
+      matchesSearch(s.supplier_name, q) ||
+      matchesSearch(s.supplier_id, q)
   );
 
   return (
-    <AppLayout title="Suppliers">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search suppliers..."
-              className="pl-9 h-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Button size="sm" className="h-9" onClick={handleOpenCreate}>
-            <Plus className="w-4 h-4 mr-1.5" /> Add Supplier
-          </Button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search suppliers..."
+            className="pl-9 h-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-
-        <Card className="shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold">ID</TableHead>
-                  <TableHead className="text-xs font-semibold">Company Name</TableHead>
-                  <TableHead className="text-xs font-semibold">Contact</TableHead>
-                  <TableHead className="text-xs font-semibold">Email</TableHead>
-                  <TableHead className="text-xs font-semibold">Phone</TableHead>
-                  <TableHead className="text-xs font-semibold">Location</TableHead>
-                  <TableHead className="text-xs font-semibold">Status</TableHead>
-                  <TableHead className="text-xs font-semibold text-right w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-                    </TableCell>
-                  </TableRow>
-                ) : filteredSuppliers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No suppliers found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredSuppliers.map((s) => (
-                    <TableRow key={s.supplier_id}>
-                      <TableCell className="text-xs font-mono font-medium">{s.supplier_id}</TableCell>
-                      <TableCell className="text-sm font-medium">{s.supplier_name}</TableCell>
-                      <TableCell className="text-xs">{s.contact_personname || "-"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{s.email || "-"}</TableCell>
-                      <TableCell className="text-xs">{s.phone || "-"}</TableCell>
-                      <TableCell className="text-xs">
-                        {s.city ? `${s.city}, ${s.state}` : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={s.is_active !== false ? "secondary" : "destructive"}
-                          className="text-xs"
-                        >
-                          {s.is_active !== false ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleOpenEdit(s.supplier_id)}
-                            className="p-1.5 rounded hover:bg-muted transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenDelete(s)}
-                            className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+        <Button size="sm" className="h-9" onClick={handleOpenCreate}>
+          <Plus className="w-4 h-4 mr-1.5" /> Add Supplier
+        </Button>
       </div>
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen && (dialogMode === "create" || dialogMode === "edit")} onOpenChange={setDialogOpen}>
+      <Card className="shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-xs font-semibold">ID</TableHead>
+                <TableHead className="text-xs font-semibold">Company Name</TableHead>
+                <TableHead className="text-xs font-semibold">Contact</TableHead>
+                <TableHead className="text-xs font-semibold">Email</TableHead>
+                <TableHead className="text-xs font-semibold">Phone</TableHead>
+                <TableHead className="text-xs font-semibold">Location</TableHead>
+                <TableHead className="text-xs font-semibold">Status</TableHead>
+                <TableHead className="text-xs font-semibold text-right w-[100px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
+              ) : filteredSuppliers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    No suppliers found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredSuppliers.map((s) => (
+                  <TableRow key={s.supplier_id}>
+                    <TableCell className="text-xs font-mono font-medium">{s.supplier_id}</TableCell>
+                    <TableCell className="text-sm font-medium">{s.supplier_name}</TableCell>
+                    <TableCell className="text-xs">{s.contact_personname || "-"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{s.email || "-"}</TableCell>
+                    <TableCell className="text-xs">{s.phone || "-"}</TableCell>
+                    <TableCell className="text-xs">
+                      {s.city ? `${s.city}, ${s.state}` : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={s.is_active !== false ? "secondary" : "destructive"}
+                        className="text-xs"
+                      >
+                        {s.is_active !== false ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(s.supplier_id)}
+                          className="p-1.5 rounded hover:bg-muted transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenDelete(s)}
+                          className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      {/* Create / Edit Dialog */}
+      <Dialog
+        open={dialogOpen && (dialogMode === "create" || dialogMode === "edit")}
+        onOpenChange={setDialogOpen}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <form onSubmit={handleSubmit}>
             <DialogHeader>
@@ -277,88 +278,46 @@ export default function SuppliersPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="supplier_name">Company Name *</Label>
-                <Input
-                  id="supplier_name"
-                  name="supplier_name"
-                  value={formData.supplier_name}
-                  onChange={handleInputChange}
-                  required
-                />
+                <Input id="supplier_name" name="supplier_name" value={formData.supplier_name}
+                  onChange={handleInputChange} required />
               </div>
-
               <div className="grid gap-2">
                 <Label htmlFor="contact_personname">Contact Person</Label>
-                <Input
-                  id="contact_personname"
-                  name="contact_personname"
-                  value={formData.contact_personname}
-                  onChange={handleInputChange}
-                />
+                <Input id="contact_personname" name="contact_personname" value={formData.contact_personname}
+                  onChange={handleInputChange} />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                  />
+                  <Input id="email" name="email" type="email" value={formData.email}
+                    onChange={handleInputChange} />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                  />
+                  <Input id="phone" name="phone" value={formData.phone}
+                    onChange={handleInputChange} />
                 </div>
               </div>
-
               <div className="grid gap-2">
                 <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  rows={2}
-                />
+                <Textarea id="address" name="address" value={formData.address}
+                  onChange={handleInputChange} rows={2} />
               </div>
-
               <div className="grid grid-cols-3 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="city">City *</Label>
-                  <Input
-                    id="city"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    required
-                  />
+                  <Input id="city" name="city" value={formData.city}
+                    onChange={handleInputChange} required />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="state">State *</Label>
-                  <Input
-                    id="state"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleInputChange}
-                    required
-                  />
+                  <Input id="state" name="state" value={formData.state}
+                    onChange={handleInputChange} required />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="country">Country *</Label>
-                  <Input
-                    id="country"
-                    name="country"
-                    value={formData.country}
-                    onChange={handleInputChange}
-                    required
-                  />
+                  <Input id="country" name="country" value={formData.country}
+                    onChange={handleInputChange} required />
                 </div>
               </div>
             </div>
@@ -377,26 +336,35 @@ export default function SuppliersPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={dialogOpen && dialogMode === "delete"} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen && dialogMode === "delete"}
+        onOpenChange={setDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Supplier</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {selectedSupplier?.supplier_name}? This action can be
-              undone by restoring the supplier.
+              Are you sure you want to delete{" "}
+              <span className="font-medium">{selectedSupplier?.supplier_name}</span>?
+              This action can be undone by restoring the supplier.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={handleSubmit} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
               {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Delete
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </div>
   );
 }

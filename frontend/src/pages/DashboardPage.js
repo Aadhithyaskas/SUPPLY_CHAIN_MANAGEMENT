@@ -43,24 +43,27 @@ export default function DashboardPage() {
         listEmployees(),
       ]);
 
-      const pendingPRs = (prs || []).filter(pr => pr.status === "Pending" || pr.status === "Finance Pending");
+      const pendingPRs = (prs || []).filter(pr => 
+        pr.status === "Pending" || pr.status === "Finance Pending"
+      );
       
       // Calculate low stock items
       let lowStockCount = 0;
-      const productList = products.products || [];
+      const productList = products?.products || [];
       for (const product of productList) {
         try {
           const stock = await getProductStock(product.product_id);
-          if ((stock.total_stock || 0) <= (product.re_order || 0)) {
+          if ((stock?.total_stock || 0) <= (product.re_order || 0)) {
             lowStockCount++;
           }
         } catch (e) {
+          console.error(`Failed to get stock for product ${product.product_id}:`, e);
           // Skip if stock check fails
         }
       }
 
       setStats({
-        totalProducts: products.count || productList.length,
+        totalProducts: products?.count || productList.length,
         pendingPRs: pendingPRs.length,
         pendingQC: qcGrns?.length || 0,
         totalSuppliers: suppliers?.length || 0,
@@ -75,7 +78,8 @@ export default function DashboardPage() {
         activities.push({
           time: pr.created_at ? new Date(pr.created_at).toLocaleString() : "Recently",
           text: `PR #${pr.pr_id} - ${pr.product?.product_name || "Product"} (${pr.status})`,
-          type: pr.status === "Approved" ? "success" : pr.status === "Rejected" ? "error" : "warning",
+          type: pr.status === "Approved" ? "success" : 
+                 pr.status === "Rejected" ? "error" : "warning",
         });
       });
       setRecentActivity(activities);
@@ -133,7 +137,7 @@ export default function DashboardPage() {
             Welcome back, {user?.name?.split(" ")[0] || "User"}
           </h1>
           <p className="text-sm text-gray-500 capitalize">
-            {user?.role?.replace("_", " ") || "Dashboard"} Dashboard
+            {user?.role?.replace(/_/g, " ") || "Dashboard"} Dashboard
           </p>
         </div>
 
@@ -144,8 +148,8 @@ export default function DashboardPage() {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {currentStats.map((stat) => (
-                <Card key={stat.label} className="shadow-sm border-gray-200">
+              {currentStats.map((stat, index) => (
+                <Card key={index} className="shadow-sm border-gray-200">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
                       <div>

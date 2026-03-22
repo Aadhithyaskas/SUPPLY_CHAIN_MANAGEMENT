@@ -24,5 +24,5 @@ urlpatterns = [
     # Product APIs
     path('api/products/', include('products.urls')),
 
-    path('api/inv/',include('Inventory.urls')),
+    path('api/inventory/',include('Inventory.urls')),
 ]

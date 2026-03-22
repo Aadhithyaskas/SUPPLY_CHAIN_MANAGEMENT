@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { login, verifyOTP, forceChangePassword, logout as apiLogout } from "../../services/apiService";
+import {
+  login,
+  verifyOTP,
+  forceChangePassword,
+  logout as apiLogout,
+} from "../../services/apiService";
 
 const AuthContext = createContext(undefined);
 
@@ -9,39 +14,44 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+  // 🔁 Restore session on refresh
   useEffect(() => {
-    // Check session storage for existing user
     const storedUser = sessionStorage.getItem("user");
     const storedToken = sessionStorage.getItem("authToken");
-    
+
     if (storedUser && storedToken) {
       setUserState(JSON.parse(storedUser));
     }
+
     setIsLoading(false);
   }, []);
 
+  // 🔐 LOGIN (Step 1 → OTP)
   const handleLogin = async (employeeId, email, password, adminId) => {
     try {
       const response = await login(employeeId, email, password, adminId);
-      
-      // Store temporary login data for OTP step
-      sessionStorage.setItem("tempLoginData", JSON.stringify({
-        employeeId,
-        email,
-        adminId,
-        role: response.role,
-      }));
-      
+
+      sessionStorage.setItem(
+        "tempLoginData",
+        JSON.stringify({
+          employeeId,
+          email,
+          adminId,
+          role: response.role,
+        })
+      );
+
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
+  // 🔑 VERIFY OTP (Step 2 → Dashboard)
   const handleVerifyOTP = async (otp) => {
     try {
       const response = await verifyOTP(otp);
-      
+
       const userData = {
         id: response.employee_id || response.admin_id,
         name: response.employee_id ? "Employee" : "Admin",
@@ -49,33 +59,49 @@ export function AuthProvider({ children }) {
         role: response.role,
         isFirstLogin: response.force_change_password || false,
       };
-      
+
+      // ✅ Save user
       setUserState(userData);
       sessionStorage.setItem("user", JSON.stringify(userData));
       sessionStorage.setItem("authToken", "authenticated");
       sessionStorage.removeItem("tempLoginData");
-      
-      return { success: true, user: userData, forceChangePassword: response.force_change_password };
+
+      // ✅ IMPORTANT: Redirect after OTP
+      if (response.force_change_password) {
+        navigate("/auth/force-change-password");
+      } else {
+        navigate("/dashboard");
+      }
+
+      return {
+        success: true,
+        user: userData,
+        forceChangePassword: response.force_change_password,
+      };
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
+  // 🔄 Force password change
   const handleForceChangePassword = async (newPassword, confirmPassword) => {
     try {
       await forceChangePassword(newPassword, confirmPassword);
-      
-      // Update user to mark first login complete
+
       const updatedUser = { ...user, isFirstLogin: false };
       setUserState(updatedUser);
       sessionStorage.setItem("user", JSON.stringify(updatedUser));
-      
+
+      // ✅ Redirect after password change
+      navigate("/dashboard");
+
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
+  // 🚪 Logout
   const handleLogout = async () => {
     try {
       await apiLogout();
@@ -86,6 +112,7 @@ export function AuthProvider({ children }) {
       sessionStorage.removeItem("user");
       sessionStorage.removeItem("authToken");
       sessionStorage.removeItem("tempLoginData");
+
       navigate("/auth/login");
     }
   };
@@ -113,6 +140,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// Hook
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

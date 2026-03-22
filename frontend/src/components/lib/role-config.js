@@ -16,6 +16,7 @@ import {
 
 const allModules = {
   dashboard: { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  products: { title: "Products", url: "/products", icon: Package },
   inventory: { title: "Inventory", url: "/inventory", icon: Package },
   purchaseRequests: { title: "Purchase Requests", url: "/purchase-requests", icon: FileText },
   asn: { title: "ASN", url: "/asn", icon: Truck },
@@ -34,12 +35,13 @@ const roleModules = {
   admin: [
     "dashboard","inventory","purchaseRequests","asn","grn",
     "users","vendors","suppliers","warehouses","outbound",
-    "qualityCheck","finance","settings"
+    "qualityCheck","finance","settings","products"
   ],
-  manager: ["dashboard", "inventory", "purchaseRequests", "asn", "outbound"],
+  manager: ["dashboard", "inventory", "purchaseRequests", "asn", "outbound","products"],
   supervisor: ["dashboard", "inventory", "asn", "grn"],
   quality_checker: ["dashboard", "qualityCheck"],
   finance_director: ["dashboard", "finance", "purchaseRequests"],
+  inventory_manager: ["dashboard", "products", "inventory", "suppliers", "vendors", "warehouses"],
 };
 
 export function getNavItemsForRole(role) {

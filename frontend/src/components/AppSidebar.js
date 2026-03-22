@@ -15,7 +15,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   useSidebar,
-} from "../components/ui/sidebar";
+} from "./ui/sidebar";
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
@@ -27,16 +27,20 @@ export function AppSidebar() {
 
   const navItems = getNavItemsForRole(user.role);
 
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = "/auth/login";
+  };
+
   return (
     <Sidebar collapsible="icon" className="border-r-0">
-      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-sidebar-border">
-        <div className="flex items-center justify-center w-8 h-8 rounded bg-sidebar-accent">
-          <Warehouse className="w-4 h-4 text-sidebar-accent-foreground" />
+      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-center w-8 h-8 rounded bg-[#1E3A8A]">
+          <Warehouse className="w-4 h-4 text-white" />
         </div>
-
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-sidebar-primary truncate">
+            <p className="text-sm font-semibold text-gray-900 truncate">
               WMS Pro
             </p>
           </div>
@@ -49,15 +53,14 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => {
                 const active = location.pathname === item.url;
-
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={active}>
                       <NavLink
                         to={item.url}
                         end
-                        className="flex items-center gap-2.5 px-3 py-2 text-sm rounded-md transition-colors duration-150 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        className="flex items-center gap-2.5 px-3 py-2 text-sm rounded-md transition-colors duration-150 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        activeClassName="bg-gray-100 text-[#1E3A8A] font-medium"
                       >
                         <item.icon className="w-4 h-4 shrink-0" />
                         {!collapsed && (
@@ -73,30 +76,26 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-3">
+      <SidebarFooter className="border-t border-gray-200 p-3">
         {!collapsed && (
           <div className="flex items-center gap-2.5 mb-3 px-1">
-            <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-xs font-semibold text-sidebar-accent-foreground">
-              {user.name.split(" ").map(n => n[0]).join("")}
+            <div className="w-8 h-8 rounded-full bg-[#1E3A8A] flex items-center justify-center text-xs font-semibold text-white">
+              {user.name?.split(" ").map(n => n[0]).join("") || "U"}
             </div>
-
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-sidebar-primary truncate">
+              <p className="text-xs font-medium text-gray-900 truncate">
                 {user.name}
               </p>
-              <p className="text-xs text-sidebar-muted-foreground capitalize truncate">
-                {user.role.replace("_", " ")}
+              <p className="text-xs text-gray-500 capitalize truncate">
+                {user.role?.replace("_", " ")}
               </p>
             </div>
           </div>
         )}
 
         <button
-          onClick={() => {
-            logout();
-            window.location.href = "/auth/login";
-          }}
-          className="flex items-center gap-2 w-full px-3 py-2 text-xs rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-150"
+          onClick={handleLogout}
+          className="flex items-center gap-2 w-full px-3 py-2 text-xs rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-150"
         >
           <LogOut className="w-3.5 h-3.5" />
           {!collapsed && "Sign Out"}

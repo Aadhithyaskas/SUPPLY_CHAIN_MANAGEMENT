@@ -5,6 +5,7 @@ import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { AuthProvider, useAuth } from "../src/components/lib/auth-context";
 import UsersPage from "./pages/UsersPage";
+import ProductsPage from "./pages/ProductsPage";
 
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/auth/force-change-password" element={<ForceChangePasswordPage />} />
             
             {/* Protected Application Routes */}
+            <Route path="/products" element={<ProductsPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
              <Route path="/users" element={<UsersPage />} />
             <Route path="/inventory" element={<InventoryPage />} />

@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "./components/ui/sonner";
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { AuthProvider, useAuth } from "../src/components/lib/auth-context";
+import UsersPage from "./pages/UsersPage";
 
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
@@ -46,7 +47,7 @@ const App = () => (
           <Routes>
             {/* Redirect root to login */}
             <Route path="/" element={<Navigate to="/auth/login" replace />} />
-            
+           
             {/* Auth Routes */}
             <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/auth/otp" element={<OTPPage />} />
@@ -54,17 +55,19 @@ const App = () => (
             <Route path="/auth/force-change-password" element={<ForceChangePasswordPage />} />
             
             {/* Protected Application Routes */}
-            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
-            <Route path="/purchase-requests" element={<ProtectedRoute><PurchaseRequestsPage /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+             <Route path="/users" element={<UsersPage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/purchase-requests" element={<PurchaseRequestsPage />} />
             <Route path="/asn" element={<ASNPage />} />
-            <Route path="/grn" element={<ProtectedRoute><GRNPage /></ProtectedRoute>} />
-            <Route path="/suppliers" element={<ProtectedRoute><SuppliersPage /></ProtectedRoute>} />
-            <Route path="/warehouses" element={<ProtectedRoute><WarehousesPage /></ProtectedRoute>} />
-            <Route path="/outbound" element={<ProtectedRoute><OutboundPage /></ProtectedRoute>} />
-            <Route path="/quality-check" element={<ProtectedRoute><QualityCheckPage /></ProtectedRoute>} />
-            <Route path="/finance" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+            <Route path="/grn" element={<GRNPage />} />
+            <Route path="/suppliers" element={<SuppliersPage />} />
+            <Route path="/warehouses" element={<WarehousesPage />} />
+            <Route path="/outbound" element={<OutboundPage />} />
+            <Route path="/quality-check" element={<QualityCheckPage />} />
+            <Route path="/finance" element={<FinancePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/" element={<Navigate to="/auth/login" replace />} />
             
             {/* Catch all - redirect to dashboard if authenticated, else login */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

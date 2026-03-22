@@ -90,7 +90,7 @@ export default function FinancePage() {
   };
 
   return (
-    <AppLayout title="Finance & Customs Duty">
+   
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="relative flex-1 max-w-sm">
@@ -170,6 +170,6 @@ export default function FinancePage() {
           </div>
         </Card>
       </div>
-    </AppLayout>
+  
   );
 }

@@ -130,7 +130,7 @@ export default function DashboardPage() {
   const currentStats = roleStats[user?.role] || roleStats.manager;
 
   return (
-    <AppLayout title="Dashboard">
+   
       <div className="space-y-4">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
@@ -198,6 +198,6 @@ export default function DashboardPage() {
           </>
         )}
       </div>
-    </AppLayout>
+   
   );
 }

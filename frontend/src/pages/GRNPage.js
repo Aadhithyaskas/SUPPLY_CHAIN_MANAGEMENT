@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AppLayout } from "../components/AppLayout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -190,7 +189,6 @@ export default function GRNPage() {
     setIsSubmitting(true);
     try {
       // Create GRN via supervisor endpoint
-      // Note: This requires the actual endpoint to be implemented
       toast({
         title: "Info",
         description: "Create GRN endpoint coming soon.",
@@ -216,104 +214,107 @@ export default function GRNPage() {
   );
 
   return (
-    <AppLayout title="Goods Received Note (GRN)">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search GRN or PO..."
-              className="pl-9 h-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          {isSupervisor && (
-            <Button size="sm" className="h-9" onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-1.5" /> New GRN Entry
-            </Button>
-          )}
-        </div>
-
-        <Card className="shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold">GRN Number</TableHead>
-                  <TableHead className="text-xs font-semibold">PO Reference</TableHead>
-                  <TableHead className="text-xs font-semibold">ASN Reference</TableHead>
-                  <TableHead className="text-xs font-semibold">Receipt Date</TableHead>
-                  <TableHead className="text-xs font-semibold">Received By</TableHead>
-                  <TableHead className="text-xs font-semibold">Status</TableHead>
-                  <TableHead className="text-xs font-semibold text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-                    </TableCell>
-                  </TableRow>
-                ) : filteredGRNs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No GRNs found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredGRNs.map((grn) => (
-                    <TableRow key={grn.grn_id}>
-                      <TableCell className="text-xs font-mono font-bold text-primary">
-                        {grn.grn_id}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono">{grn.po?.po_id || "-"}</TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">
-                        {grn.asn?.asn_id || "-"}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {grn.receipt_date ? new Date(grn.receipt_date).toLocaleDateString() : "-"}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {grn.received_by?.username || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={statusMap[grn.status]?.variant || "outline"}
-                          className="text-xs uppercase"
-                        >
-                          {statusMap[grn.status]?.label || grn.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleViewGRN(grn.grn_id)}
-                            className="p-1.5 rounded hover:bg-muted transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                          {isQC && grn.status === "QC_PENDING" && (
-                            <button
-                              onClick={() => handleQCApprove(grn)}
-                              className="p-1.5 rounded hover:bg-success/10 transition-colors"
-                              title="QC Approve"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5 text-success" />
-                            </button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Goods Received Notes</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage goods receipts and quality control</p>
       </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search GRN or PO..."
+            className="pl-9 h-9 border-gray-200"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {isSupervisor && (
+          <Button size="sm" className="h-9 bg-[#1E3A8A] hover:bg-[#1E293B]" onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-1.5" /> New GRN Entry
+          </Button>
+        )}
+      </div>
+
+      <Card className="shadow-sm border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead className="text-xs font-semibold text-gray-600">GRN Number</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">PO Reference</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">ASN Reference</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">Receipt Date</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">Received By</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">Status</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#1E3A8A]" />
+                  </TableCell>
+                </TableRow>
+              ) : filteredGRNs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                    No GRNs found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredGRNs.map((grn) => (
+                  <TableRow key={grn.grn_id} className="hover:bg-gray-50">
+                    <TableCell className="text-xs font-mono font-bold text-[#1E3A8A]">
+                      {grn.grn_id}
+                    </TableCell>
+                    <TableCell className="text-xs font-mono text-gray-600">{grn.po?.po_id || "-"}</TableCell>
+                    <TableCell className="text-xs font-mono text-gray-500">
+                      {grn.asn?.asn_id || "-"}
+                    </TableCell>
+                    <TableCell className="text-xs text-gray-500">
+                      {grn.receipt_date ? new Date(grn.receipt_date).toLocaleDateString() : "-"}
+                    </TableCell>
+                    <TableCell className="text-xs text-gray-600">
+                      {grn.received_by?.username || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={statusMap[grn.status]?.variant || "outline"}
+                        className="text-xs uppercase"
+                      >
+                        {statusMap[grn.status]?.label || grn.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleViewGRN(grn.grn_id)}
+                          className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+                          title="View Details"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                        {isQC && grn.status === "QC_PENDING" && (
+                          <button
+                            onClick={() => handleQCApprove(grn)}
+                            className="p-1.5 rounded hover:bg-green-50 transition-colors"
+                            title="QC Approve"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
 
       {/* View GRN Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
@@ -326,41 +327,41 @@ export default function GRNPage() {
           </DialogHeader>
 
           {grnSummary && (
-            <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg mb-4">
+            <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg mb-4">
               <div>
-                <p className="text-xs text-muted-foreground">Total Received</p>
-                <p className="text-lg font-bold">{grnSummary.received}</p>
+                <p className="text-xs text-gray-500">Total Received</p>
+                <p className="text-lg font-bold text-gray-900">{grnSummary.received}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Accepted</p>
-                <p className="text-lg font-bold text-success">{grnSummary.accepted}</p>
+                <p className="text-xs text-gray-500">Accepted</p>
+                <p className="text-lg font-bold text-green-600">{grnSummary.accepted}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Rejected</p>
-                <p className="text-lg font-bold text-destructive">{grnSummary.rejected}</p>
+                <p className="text-xs text-gray-500">Rejected</p>
+                <p className="text-lg font-bold text-red-600">{grnSummary.rejected}</p>
               </div>
             </div>
           )}
 
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Received</TableHead>
-                <TableHead className="text-right">Accepted</TableHead>
-                <TableHead className="text-right">Rejected</TableHead>
-                <TableHead>QC Status</TableHead>
+              <TableRow className="bg-gray-50">
+                <TableHead className="text-xs font-semibold text-gray-600">Product</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Received</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Accepted</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Rejected</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600">QC Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {grnItems.map((item) => (
                 <TableRow key={item.grn_item_id}>
-                  <TableCell className="text-sm font-medium">
+                  <TableCell className="text-sm font-medium text-gray-900">
                     {item.product?.product_name}
                   </TableCell>
-                  <TableCell className="text-right">{item.received_quantity}</TableCell>
-                  <TableCell className="text-right text-success">{item.accepted_quantity || 0}</TableCell>
-                  <TableCell className="text-right text-destructive">{item.rejected_quantity || 0}</TableCell>
+                  <TableCell className="text-right text-gray-700">{item.received_quantity}</TableCell>
+                  <TableCell className="text-right text-green-600">{item.accepted_quantity || 0}</TableCell>
+                  <TableCell className="text-right text-red-600">{item.rejected_quantity || 0}</TableCell>
                   <TableCell>
                     <Badge
                       variant={item.qc_status === "Completed" ? "secondary" : "outline"}
@@ -394,12 +395,12 @@ export default function GRNPage() {
 
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Received</TableHead>
-                <TableHead className="text-right">Accepted</TableHead>
-                <TableHead className="text-right">Rejected</TableHead>
-                <TableHead className="text-center">Action</TableHead>
+              <TableRow className="bg-gray-50">
+                <TableHead className="text-xs font-semibold text-gray-600">Product</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Received</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Accepted</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Rejected</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-center">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -418,7 +419,7 @@ export default function GRNPage() {
             <Button variant="outline" onClick={() => setQcDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleFinalApprove} disabled={isSubmitting}>
+            <Button onClick={handleFinalApprove} disabled={isSubmitting} className="bg-[#1E3A8A] hover:bg-[#1E293B]">
               {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Final Approve & Update Inventory
             </Button>
@@ -439,13 +440,13 @@ export default function GRNPage() {
 
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>Purchase Order</Label>
+                <Label className="text-sm font-medium text-gray-700">Purchase Order</Label>
                 <Select
                   value={newGRN.po_id}
                   onValueChange={(value) => setNewGRN({ ...newGRN, po_id: value })}
                   required
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="border-gray-200">
                     <SelectValue placeholder="Select PO" />
                   </SelectTrigger>
                   <SelectContent>
@@ -459,12 +460,12 @@ export default function GRNPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label>ASN (Optional)</Label>
+                <Label className="text-sm font-medium text-gray-700">ASN (Optional)</Label>
                 <Select
                   value={newGRN.asn_id}
                   onValueChange={(value) => setNewGRN({ ...newGRN, asn_id: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="border-gray-200">
                     <SelectValue placeholder="Select ASN" />
                   </SelectTrigger>
                   <SelectContent>
@@ -478,12 +479,13 @@ export default function GRNPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label>Receipt Date</Label>
+                <Label className="text-sm font-medium text-gray-700">Receipt Date</Label>
                 <Input
                   type="date"
                   value={newGRN.receipt_date}
                   onChange={(e) => setNewGRN({ ...newGRN, receipt_date: e.target.value })}
                   required
+                  className="border-gray-200"
                 />
               </div>
             </div>
@@ -492,7 +494,7 @@ export default function GRNPage() {
               <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="bg-[#1E3A8A] hover:bg-[#1E293B]">
                 {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Create GRN
               </Button>
@@ -500,7 +502,7 @@ export default function GRNPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </div>
   );
 }
 
@@ -519,8 +521,8 @@ function QCItemRow({ item, onUpdate, isSubmitting }) {
 
   return (
     <TableRow>
-      <TableCell className="text-sm font-medium">{item.product?.product_name}</TableCell>
-      <TableCell className="text-right">{item.received_quantity}</TableCell>
+      <TableCell className="text-sm font-medium text-gray-900">{item.product?.product_name}</TableCell>
+      <TableCell className="text-right text-gray-700">{item.received_quantity}</TableCell>
       <TableCell className="text-right">
         <Input
           type="number"
@@ -528,7 +530,7 @@ function QCItemRow({ item, onUpdate, isSubmitting }) {
           max={item.received_quantity}
           value={acceptedQty}
           onChange={(e) => setAcceptedQty(parseInt(e.target.value) || 0)}
-          className="w-24 text-right"
+          className="w-24 text-right border-gray-200"
           disabled={item.qc_status === "Completed"}
         />
       </TableCell>
@@ -539,7 +541,7 @@ function QCItemRow({ item, onUpdate, isSubmitting }) {
           max={item.received_quantity}
           value={rejectedQty}
           onChange={(e) => setRejectedQty(parseInt(e.target.value) || 0)}
-          className="w-24 text-right"
+          className="w-24 text-right border-gray-200"
           disabled={item.qc_status === "Completed"}
         />
       </TableCell>
@@ -550,9 +552,15 @@ function QCItemRow({ item, onUpdate, isSubmitting }) {
             variant="outline"
             onClick={handleSave}
             disabled={isSubmitting}
+            className="border-gray-200"
           >
             Save
           </Button>
+        )}
+        {item.qc_status === "Completed" && (
+          <Badge variant="secondary" className="text-xs">
+            Completed
+          </Badge>
         )}
       </TableCell>
     </TableRow>

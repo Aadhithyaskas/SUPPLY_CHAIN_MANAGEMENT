@@ -1,7 +1,6 @@
-// AppSidebar.jsx
 import React from "react";
 import { useLocation } from "react-router-dom";
-import { NavLink } from "./NavLink";
+import { NavLink } from "./NavLink";  // ✅ Import your NavLink component
 import { useAuth } from "../components/lib/auth-context";
 import { getNavItemsForRole } from "../components/lib/role-config";
 import { LogOut, Warehouse } from "lucide-react";
@@ -19,6 +18,7 @@ import {
 } from "./ui/sidebar";
 
 export function AppSidebar() {
+  console.log("Sidebar Rendered");
   const { user, logout } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -30,12 +30,11 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = "/auth/login";
   };
 
   return (
     <Sidebar collapsible="icon" className="border-r">
-      {/* Logo Section - Fixed alignment */}
+      {/* Logo Section */}
       <div className="flex items-center px-4 py-5 border-b">
         <div className="flex items-center gap-3 w-full">
           <div className="flex items-center justify-center w-8 h-8 rounded bg-[#1E3A8A] shrink-0">
@@ -50,7 +49,7 @@ export function AppSidebar() {
         </div>
       </div>
 
-      {/* Navigation Items - Fixed spacing and alignment */}
+      {/* Navigation Items */}
       <SidebarContent className="py-4">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -63,14 +62,8 @@ export function AppSidebar() {
                       <NavLink
                         to={item.url}
                         end
-                        className={`
-                          flex items-center w-full px-4 py-2.5
-                          text-sm rounded-md transition-colors
-                          ${active 
-                            ? 'bg-gray-100 text-[#1E3A8A] font-medium' 
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                          }
-                        `}
+                        className="flex items-center w-full px-4 py-2.5 text-sm rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        activeClassName="bg-gray-100 text-[#1E3A8A] font-medium"
                       >
                         <item.icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#1E3A8A]' : 'text-gray-500'}`} />
                         {!collapsed && (
@@ -86,7 +79,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* User Profile & Footer - Fixed alignment */}
+      {/* User Profile & Footer */}
       <SidebarFooter className="border-t mt-auto">
         <div className="p-4">
           {!collapsed ? (

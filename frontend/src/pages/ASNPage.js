@@ -1,11 +1,17 @@
 import { useState, useEffect } from "react";
-import { AppLayout } from "../components/AppLayout.js";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, Pencil, Trash2, Eye, Loader2 } from "lucide-react";
+import { Plus, Search, Trash2, Eye, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { Label } from "../components/ui/label";
-import { listASN, getASN, deleteASN, listVendors } from "../services/apiService";
+import { listASN, getASN, deleteASN } from "../services/apiService";
 import { useToast } from "../components/ui/use-toast";
 
 const statusStyles = {
@@ -28,9 +33,11 @@ const statusStyles = {
 
 export default function ASNPage() {
   const { toast } = useToast();
+
   const [search, setSearch] = useState("");
   const [asnData, setAsnData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedASN, setSelectedASN] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,7 +69,6 @@ export default function ASNPage() {
       setSelectedASN(asn);
       setViewDialogOpen(true);
     } catch (error) {
-      console.error("Failed to load ASN details:", error);
       toast({
         title: "Error",
         description: "Failed to load ASN details.",
@@ -73,13 +79,18 @@ export default function ASNPage() {
 
   const handleDeleteASN = async (asnId) => {
     if (!window.confirm("Are you sure you want to delete this ASN?")) return;
+
     setIsSubmitting(true);
     try {
       await deleteASN(asnId);
       toast({ title: "Success", description: "ASN deleted successfully." });
       loadASNs();
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -91,169 +102,124 @@ export default function ASNPage() {
   );
 
   return (
-    <AppLayout title="Advanced Shipment Notices">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search ASN..."
-              className="pl-9 h-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Button size="sm" className="h-9" asChild>
-            <a href="/asn/create">
-              <Plus className="w-4 h-4 mr-1.5" /> New ASN
-            </a>
-          </Button>
+    <div className="space-y-4">
+      
+      {/* Top Section */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search ASN..."
+            className="pl-9 h-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
 
-        <Card className="shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold">ASN ID</TableHead>
-                  <TableHead className="text-xs font-semibold">Vendor</TableHead>
-                  <TableHead className="text-xs font-semibold text-right">Items</TableHead>
-                  <TableHead className="text-xs font-semibold">Shipment Date</TableHead>
-                  <TableHead className="text-xs font-semibold">ETA</TableHead>
-                  <TableHead className="text-xs font-semibold">Driver</TableHead>
-                  <TableHead className="text-xs font-semibold">Status</TableHead>
-                  <TableHead className="text-xs font-semibold text-right w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-                    </TableCell>
-                  </TableRow>
-                ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No ASNs found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((asn) => (
-                    <TableRow key={asn.asn_id}>
-                      <TableCell className="text-xs font-mono font-medium">{asn.asn_id}</TableCell>
-                      <TableCell className="text-sm">{asn.vendor?.vendor_name || "-"}</TableCell>
-                      <TableCell className="text-sm text-right tabular-nums">
-                        {asn.items?.length || 0}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {asn.shipment_date ? new Date(asn.shipment_date).toLocaleDateString() : "-"}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {asn.expected_arrival_date ? new Date(asn.expected_arrival_date).toLocaleDateString() : "-"}
-                      </TableCell>
-                      <TableCell className="text-xs">{asn.driver_name || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusStyles[asn.status]?.variant || "secondary"} className="text-xs">
-                          {statusStyles[asn.status]?.label || asn.status || "Pending"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleViewASN(asn.asn_id)}
-                            className="p-1.5 rounded hover:bg-muted transition-colors"
-                            title="View"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteASN(asn.asn_id)}
-                            className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
-                            title="Delete"
-                            disabled={isSubmitting}
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+        <Button size="sm" className="h-9" asChild>
+          <a href="/asn/create">
+            <Plus className="w-4 h-4 mr-1.5" /> New ASN
+          </a>
+        </Button>
       </div>
 
-      {/* View ASN Dialog */}
+      {/* Table */}
+      <Card className="shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>ASN ID</TableHead>
+                <TableHead>Vendor</TableHead>
+                <TableHead className="text-right">Items</TableHead>
+                <TableHead>Shipment Date</TableHead>
+                <TableHead>ETA</TableHead>
+                <TableHead>Driver</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                  </TableCell>
+                </TableRow>
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    No ASNs found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((asn) => (
+                  <TableRow key={asn.asn_id}>
+                    <TableCell>{asn.asn_id}</TableCell>
+                    <TableCell>{asn.vendor?.vendor_name || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      {asn.items?.length || 0}
+                    </TableCell>
+                    <TableCell>
+                      {asn.shipment_date
+                        ? new Date(asn.shipment_date).toLocaleDateString()
+                        : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {asn.expected_arrival_date
+                        ? new Date(asn.expected_arrival_date).toLocaleDateString()
+                        : "-"}
+                    </TableCell>
+                    <TableCell>{asn.driver_name || "-"}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusStyles[asn.status]?.variant || "secondary"}>
+                        {statusStyles[asn.status]?.label || asn.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => handleViewASN(asn.asn_id)}>
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteASN(asn.asn_id)}
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      {/* View Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>ASN Details: {selectedASN?.asn_id}</DialogTitle>
+            <DialogTitle>ASN Details</DialogTitle>
             <DialogDescription>
-              Vendor: {selectedASN?.vendor?.vendor_name}
+              {selectedASN?.vendor?.vendor_name}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <div>
-              <p className="text-xs text-muted-foreground">ASN Number</p>
-              <p className="text-sm font-mono">{selectedASN?.asn_number}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Status</p>
-              <Badge variant={statusStyles[selectedASN?.status]?.variant}>
-                {statusStyles[selectedASN?.status]?.label || selectedASN?.status}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Shipment Date</p>
-              <p className="text-sm">{selectedASN?.shipment_date}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Expected Arrival</p>
-              <p className="text-sm">{selectedASN?.expected_arrival_date}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Vehicle Number</p>
-              <p className="text-sm">{selectedASN?.vehicle_num || "-"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Driver</p>
-              <p className="text-sm">{selectedASN?.driver_name} / {selectedASN?.driver_phone}</p>
-            </div>
+          <div className="space-y-2">
+            <p><b>ASN:</b> {selectedASN?.asn_id}</p>
+            <p><b>Status:</b> {selectedASN?.status}</p>
+            <p><b>Driver:</b> {selectedASN?.driver_name}</p>
           </div>
 
-          {selectedASN?.items?.length > 0 && (
-            <>
-              <h4 className="text-sm font-semibold mt-2">Items</h4>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Expected</TableHead>
-                    <TableHead className="text-right">Shipped</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedASN.items.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>{item.product?.product_name}</TableCell>
-                      <TableCell className="text-right">{item.expected_quantity}</TableCell>
-                      <TableCell className="text-right">{item.shipped_quantity}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </>
-          )}
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>Close</Button>
+            <Button onClick={() => setViewDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+
+    </div>
   );
 }

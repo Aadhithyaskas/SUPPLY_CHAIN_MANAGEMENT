@@ -1,4 +1,3 @@
-# settings.py
 import os
 from pathlib import Path
 
@@ -27,7 +26,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',   # ← must be BEFORE CommonMiddleware
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -75,23 +74,21 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://192.168.1.10:3000",
 ]
-CORS_ALLOW_CREDENTIALS = True          # required — sends cookies cross-origin
+CORS_ALLOW_CREDENTIALS = True
 
 # ─── CSRF ────────────────────────────────────────────────────────────────────
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://192.168.1.10:3000",
 ]
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
 
-# FIX 1: 'Lax' (the default) blocks the cookie on cross-origin POST.
-# 'None' allows it. Requires CSRF_COOKIE_SECURE=False for http in dev.
-CSRF_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SECURE = False             # set True in production (https only)
-CSRF_COOKIE_HTTPONLY = False           # must be False so JS can read it
-
-# FIX 2: Session cookie must also travel cross-origin on POST requests
-SESSION_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = False          # set True in production
+# ─── SESSION ─────────────────────────────────────────────────────────────────
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = False
+SESSION_SAVE_EVERY_REQUEST = True
 
 # ─── i18n ────────────────────────────────────────────────────────────────────
 LANGUAGE_CODE = 'en-us'
@@ -110,3 +107,4 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'ganuu1121@gmail.com'
 EMAIL_HOST_PASSWORD = 'jzbk opmk rabh ivax'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+

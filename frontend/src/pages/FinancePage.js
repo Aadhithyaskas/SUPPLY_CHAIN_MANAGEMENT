@@ -125,7 +125,7 @@ export default function FinancePage() {
               <TableHead className="text-xs font-semibold text-right">Amount (₹)</TableHead>
               <TableHead className="text-xs font-semibold">Status</TableHead>
               <TableHead className="text-xs font-semibold">Date</TableHead>
-              <TableHead className="text-xs font-semibold">Reference</TableHead>
+              {/* <TableHead className="text-xs font-semibold">Reference</TableHead> */}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -162,7 +162,7 @@ export default function FinancePage() {
                   <TableCell className="text-xs text-muted-foreground">
                     {item.date ? new Date(item.date).toLocaleDateString() : "-"}
                   </TableCell>
-                  <TableCell className="text-xs">{item.reference}</TableCell>
+                  {/* <TableCell className="text-xs">{item.reference}</TableCell> */}
                 </TableRow>
               ))
             )}

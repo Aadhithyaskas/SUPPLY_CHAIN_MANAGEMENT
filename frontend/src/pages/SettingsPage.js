@@ -6,13 +6,14 @@ import { Button } from "../components/ui/button";
 import { Switch } from "../components/ui/switch";
 import { Loader2 } from "lucide-react";
 import { useToast } from "../components/ui/use-toast";
-import { getWarehouse, updateWarehouse } from "../services/apiService";
+import { getWarehouse, updateWarehouse, createWarehouse } from "../services/apiService";
 
 // ✅ No <AppLayout> — layout is provided by the router via <Outlet>
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isNew, setIsNew] = useState(false); // ✅ tracks if warehouse exists in DB
   const [warehouse, setWarehouse] = useState({
     warehouse_name: "",
     warehouse_email: "",
@@ -33,14 +34,20 @@ export default function SettingsPage() {
     setIsLoading(true);
     try {
       const data = await getWarehouse();
-      setWarehouse({
-        warehouse_name:  data?.warehouse_name  ?? "",
-        warehouse_email: data?.warehouse_email ?? "",
-        warehouse_phone: data?.warehouse_phone ?? "",
-        address:         data?.address         ?? "",
-      });
+      if (data) {
+        setWarehouse({
+          warehouse_name:  data?.warehouse_name  ?? "",
+          warehouse_email: data?.warehouse_email ?? "",
+          warehouse_phone: data?.warehouse_phone ?? "",
+          address:         data?.address         ?? "",
+        });
+        setIsNew(false); // ✅ warehouse exists → update mode
+      } else {
+        setIsNew(true);  // ✅ no warehouse yet → create mode
+      }
     } catch (error) {
       console.error("Failed to load warehouse:", error);
+      setIsNew(true);    // ✅ treat fetch failure as "not created yet"
       toast({
         title: "Error",
         description: "Failed to load warehouse settings.",
@@ -55,8 +62,14 @@ export default function SettingsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await updateWarehouse(warehouse);
-      toast({ title: "Success", description: "Warehouse settings updated." });
+      if (isNew) {
+        await createWarehouse(warehouse); // ✅ POST on fresh DB
+        setIsNew(false);
+        toast({ title: "Success", description: "Warehouse created successfully." });
+      } else {
+        await updateWarehouse(warehouse); // ✅ PUT/PATCH if already exists
+        toast({ title: "Success", description: "Warehouse settings updated." });
+      }
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -69,7 +82,6 @@ export default function SettingsPage() {
     toast({ title: "Saved", description: `${key} notification preference updated.` });
   };
 
-  // ✅ FIX: loading spinner no longer wrapped in <AppLayout>
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -125,7 +137,7 @@ export default function SettingsPage() {
             </div>
             <Button size="sm" type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Warehouse
+              {isNew ? "Create Warehouse" : "Save Warehouse"} {/* ✅ dynamic label */}
             </Button>
           </CardContent>
         </Card>

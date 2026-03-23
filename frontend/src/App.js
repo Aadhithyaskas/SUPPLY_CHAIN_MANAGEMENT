@@ -21,6 +21,9 @@ import OutboundPage from "./pages/OutboundPage";
 import QualityCheckPage from "./pages/QualityCheckPage";
 import FinancePage from "./pages/FinancePage";
 import SettingsPage from "./pages/SettingsPage";
+import VendorsPage from "./pages/VendorsPage";
+//import CreateVendorPage from "./pages/CreateVendorPage";
+import CreateVendorPage from "./pages/CreateVendorPage";
 
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
@@ -77,6 +80,8 @@ const App = () => (
               <Route path="/asn" element={<ASNPage />} />
               <Route path="/grn" element={<GRNPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
+              <Route path="/vendors" element={<VendorsPage />} />
+              <Route path="/vendors/create" element={<CreateVendorPage />} />
               <Route path="/warehouses" element={<WarehousesPage />} />
               <Route path="/outbound" element={<OutboundPage />} />
               <Route path="/quality-check" element={<QualityCheckPage />} />

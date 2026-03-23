@@ -370,7 +370,7 @@ export default function PurchaseRequestsPage() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Requested By</p>
-                    <p className="text-sm text-gray-700">{detailPR?.created_by?.username || "System"}</p>
+                    <p className="text-sm text-gray-700">{detailPR?.created_by?.username || "N/A"}</p>
                   </div>
                 </div>
               </div>

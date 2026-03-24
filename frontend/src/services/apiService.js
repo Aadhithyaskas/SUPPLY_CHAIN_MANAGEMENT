@@ -3,9 +3,6 @@ import { getCookie } from '../components/utils/helpers';
 
 /* ================= CSRF ================= */
 
-// FIX: always fetch a fresh CSRF token before every mutating request.
-// The old version only fetched when the cookie was absent — if the cookie
-// existed but was stale/mismatched, every POST/PUT/DELETE silently got a 403.
 export const ensureCSRF = async () => {
   await fetch(`${API_BASE_URL}/auth/csrf/`, {
     method: 'GET',
@@ -14,8 +11,8 @@ export const ensureCSRF = async () => {
 };
 
 /* ================= BASE API ================= */
+
 export const apiRequest = async (endpoint, method = 'GET', data = null) => {
-  // Only hit the CSRF endpoint for mutating methods — GETs don't need it
   if (method !== 'GET') {
     await ensureCSRF();
   }
@@ -51,6 +48,7 @@ export const apiRequest = async (endpoint, method = 'GET', data = null) => {
 };
 
 /* ================= AUTH ================= */
+
 export const login = (employeeId, email, password, adminId) =>
   apiRequest('/auth/login/', 'POST', {
     employee_id: employeeId,
@@ -81,6 +79,7 @@ export const forceChangePassword = (newPassword, confirmPassword) =>
 export const logout = () => apiRequest('/auth/logout/', 'POST');
 
 /* ================= EMPLOYEE ================= */
+
 export const adminCreateUser = (data) =>
   apiRequest('/auth/admin-create-user/', 'POST', data);
 
@@ -94,6 +93,7 @@ export const deleteEmployee = (employeeId) =>
   apiRequest(`/auth/delete-user/${employeeId}/`, 'DELETE');
 
 /* ================= SUPPLIER ================= */
+
 export const createSupplier = (data) =>
   apiRequest('/suppliers/create/', 'POST', data);
 
@@ -116,6 +116,7 @@ export const listInactiveSuppliers = () =>
   apiRequest('/suppliers/inactive/', 'GET');
 
 /* ================= VENDOR ================= */
+
 export const createVendor = (data) =>
   apiRequest('/vendors/create/', 'POST', data);
 
@@ -132,6 +133,7 @@ export const deleteVendor = (id) =>
   apiRequest(`/vendors/delete/${id}/`, 'DELETE');
 
 /* ================= WAREHOUSE ================= */
+
 export const createWarehouse = (data) =>
   apiRequest('/vendors/Warehouse/create/', 'POST', data);
 
@@ -142,6 +144,7 @@ export const getWarehouse = () =>
   apiRequest('/vendors/warehouse/', 'GET');
 
 /* ================= PRODUCT ================= */
+
 export const createProduct = (data) =>
   apiRequest('/products/create/', 'POST', data);
 
@@ -158,6 +161,7 @@ export const deleteProduct = (id) =>
   apiRequest(`/products/delete/${id}/`, 'DELETE');
 
 /* ================= INVENTORY ================= */
+
 export const createInventory = (data) =>
   apiRequest('/inventory/create/', 'POST', data);
 
@@ -170,7 +174,11 @@ export const removeStock = (productId, quantity) =>
 export const getProductStock = (productId) =>
   apiRequest(`/inventory/product-stock/${productId}/`, 'GET');
 
-/* ================= PURCHASE ================= */
+export const listInventory = () =>
+  apiRequest('/inventory/create/', 'GET');
+
+/* ================= PURCHASE REQUEST ================= */
+
 export const listPurchaseRequests = () =>
   apiRequest('/inventory/purchase-requests/', 'GET');
 
@@ -183,7 +191,17 @@ export const managerApprovePR = (prId) =>
 export const financeApprovePR = (prId) =>
   apiRequest(`/inventory/pr/finance-approve/${prId}/`, 'POST');
 
+/* ================= PURCHASE ORDER ================= */
+
+// FIX: was pointing to purchase-requests/ — now hits the real PO endpoint
+export const listPurchaseOrders = () =>
+  apiRequest('/inventory/po-list/', 'GET');
+
+export const getPurchaseOrder = (id) =>
+  apiRequest(`/inventory/po-list/${id}/`, 'GET');
+
 /* ================= ASN ================= */
+
 export const createASN = (data) =>
   apiRequest('/inventory/create-asn/', 'POST', data);
 
@@ -206,45 +224,52 @@ export const getASNItem = (id) =>
   apiRequest(`/inventory/asn-item/${id}/`, 'GET');
 
 /* ================= GRN ================= */
+/* ================= GRN ================= */
+
+// Create GRN (Generic)
 export const createGRN = (data) =>
   apiRequest('/inventory/create-grn/', 'POST', data);
 
+// Supervisor creates GRN header
 export const createGRNBySupervisor = (data) =>
   apiRequest('/inventory/grn/supervisor-create/', 'POST', data);
 
+// Supervisor adds line items (received_quantity only)
+export const supervisorAddGRNItems = (data) =>
+  apiRequest('/inventory/grn/supervisor-add-items/', 'POST', data);
+
+// List all GRNs
 export const listGRNs = () =>
   apiRequest('/inventory/grn-list/', 'GET');
 
+// Get single GRN
 export const getGRN = (id) =>
   apiRequest(`/inventory/grn/${id}/`, 'GET');
 
+// Get GRN items by GRN ID
 export const getGRNItems = (id) =>
   apiRequest(`/inventory/grn/${id}/items/`, 'GET');
 
+// Create GRN items (Generic)
 export const createGRNItems = (data) =>
   apiRequest('/inventory/create-grn-items/', 'POST', data);
 
-export const updateGRNItem = (id, data) =>
-  apiRequest(`/inventory/grn-item/${id}/`, 'PUT', data);
+// QC updates accepted/rejected quantities on a single item
+export const qcUpdateGRNItem = (id, data) =>
+  apiRequest(`/inventory/grn-item/${id}/qc/`, 'PUT', data);
 
+// Approve GRN (QC final approval)
 export const approveGRN = (id) =>
   apiRequest(`/inventory/grn/qc-approve/${id}/`, 'POST');
 
+// Get QC pending GRNs
 export const getQCPendingGRNs = () =>
   apiRequest('/inventory/grn/qc-pending/', 'GET');
 
+// Get GRNs created by current supervisor
 export const getMyGRNs = () =>
   apiRequest('/inventory/grn/my-grns/', 'GET');
 
+// Get GRN summary (received/accepted/rejected totals)
 export const getGRNSummary = (id) =>
   apiRequest(`/inventory/grn/${id}/summary/`, 'GET');
-
-/* ================= FALLBACKS ================= */
-export const listPurchaseOrders = () =>
-  apiRequest('/inventory/purchase-requests/', 'GET');
-
-export const getPurchaseOrder = (id) =>
-  apiRequest(`/inventory/purchase-requests/${id}/`, 'GET');
-
-export const listInventory = () =>
-  apiRequest('/products/listall/', 'GET');

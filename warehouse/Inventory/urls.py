@@ -14,36 +14,37 @@ urlpatterns = [
     path("pr/manager-approve/<str:pr_id>/", ManagerApprovePR.as_view()),
     path("pr/finance-approve/<str:pr_id>/", FinanceApprovePR.as_view()),
 
+    # ================= PURCHASE ORDER =================
+    path("po-list/", PurchaseOrderListView.as_view()),
+
     # ================= ASN =================
-    path('create-asn/', ASNCreateView.as_view()),
-    path('asn-list/', ASNListView.as_view()),
-    path('asn/<str:pk>/', ASNDetailView.as_view()),   # ✅ FIXED (was int)
-    path('create-asn-item/', CreateASNItemView.as_view()),
+    path("create-asn/", ASNCreateView.as_view()),
+    path("asn-list/", ASNListView.as_view()),
+    path("asn/<str:pk>/", ASNDetailView.as_view()),
 
     # ================= ASN ITEMS =================
-    path('asn-item/', ASNItemListView.as_view()),
-    path('asn-item/<str:pk>/', ASNItemDetailView.as_view()),
+    path("create-asn-item/", CreateASNItemView.as_view()),
+    path("asn-item/", ASNItemListView.as_view()),
+    path("asn-item/<str:pk>/", ASNItemDetailView.as_view()),
 
-    # ================= GRN (IMPORTANT ORDER) =================
+    # ================= GRN =================
+    # -- static routes first --
+    path("grn/supervisor-create/", SupervisorCreateGRN.as_view()),
+    path("grn/supervisor-add-items/", SupervisorAddGRNItems.as_view()),  # ✅ moved up
+    path("grn/my-grns/", SupervisorGRNListView.as_view()),
+    path("grn/qc-pending/", GRNQCPendingListView.as_view()),
+    path("grn/qc-approve/<str:grn_id>/", QCApproveGRN.as_view()),
+    path("grn-list/", GRNListView.as_view()),
+    path("create-grn/", GRNCreateView.as_view()),
 
-    # 🔥 SPECIFIC ROUTES FIRST
-    path('grn/supervisor-create/', SupervisorCreateGRN.as_view()),
-    path('grn/qc-approve/<str:grn_id>/', QCApproveGRN.as_view()),
-    path('grn/qc-pending/', GRNQCPendingListView.as_view()),
-    path('grn/my-grns/', SupervisorGRNListView.as_view()),
-    path('grn/<str:grn_id>/items/', GRNItemsByGRNView.as_view()),
-    path('grn/<str:grn_id>/summary/', GRNSummaryView.as_view()),
-
-    # 🔥 NORMAL ROUTES
-    path('create-grn/', GRNCreateView.as_view()),
-    path('grn-list/', GRNListView.as_view()),
-
-    # 🔥 DYNAMIC LAST (VERY IMPORTANT)
-    path('grn/<str:pk>/', GRNDetailView.as_view()),
+    # -- dynamic segments after static --
+    path("grn/<str:grn_id>/items/", GRNItemsByGRNView.as_view()),
+    path("grn/<str:grn_id>/summary/", GRNSummaryView.as_view()),
+    path("grn/<str:pk>/", GRNDetailView.as_view()),          # ✅ dynamic last
 
     # ================= GRN ITEMS =================
-    path('create-grn-items/', GRNItemCreateView.as_view()),
-    path('grn-items-list/', GRNItemListView.as_view()),
-    path('grn-item/<str:pk>/', GRNItemDetailView.as_view()),
+    path("create-grn-items/", GRNItemCreateView.as_view()),
+    path("grn-items-list/", GRNItemListView.as_view()),
+    path("grn-item/<str:pk>/qc/", QCUpdateGRNItem.as_view()),  # ✅ specific first
+    path("grn-item/<str:pk>/", GRNItemDetailView.as_view()),   # ✅ dynamic last
 ]
-    

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
@@ -17,32 +17,46 @@ import { useToast } from "../components/ui/use-toast";
 import {
   getQCPendingGRNs,
   getGRNItems,
-  updateGRNItem,
+  qcUpdateGRNItem,
   approveGRN,
   getGRNSummary,
 } from "../services/apiService";
 
-// Normalise any API response to a plain array
+// Improved toArray function to handle different response formats
 const toArray = (res, knownKey = null) => {
   if (!res) return [];
+  
+  // If it's already an array, return it
   if (Array.isArray(res)) return res;
+  
+  // If we know the key where the array lives
   if (knownKey && Array.isArray(res[knownKey])) return res[knownKey];
-  for (const key of ["results", "data", "items"]) {
-    if (Array.isArray(res[key])) return res[key];
+  
+  // Check for common response patterns
+  if (Array.isArray(res.data)) return res.data;
+  if (Array.isArray(res.results)) return res.results;
+  if (Array.isArray(res.items)) return res.items;
+  if (Array.isArray(res.grns)) return res.grns;
+  
+  // If none of the above, try to find the first array in the object
+  for (const key in res) {
+    if (Array.isArray(res[key])) {
+      return res[key];
+    }
   }
-  return Object.values(res).find(Array.isArray) || [];
+  
+  return [];
 };
 
-// Safe search: coerces any value type to string before matching
 const matchesSearch = (value, query) =>
   String(value ?? "").toLowerCase().includes(query);
 
-// ✅ No <AppLayout> — layout is provided by the router via <Outlet>
 export default function QualityCheckPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [pendingGRNs, setPendingGRNs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedGRN, setSelectedGRN] = useState(null);
   const [grnItems, setGrnItems] = useState([]);
   const [grnSummary, setGrnSummary] = useState(null);
@@ -50,39 +64,96 @@ export default function QualityCheckPage() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadPendingGRNs();
-  }, []);
-
-  const loadPendingGRNs = async () => {
+  const loadPendingGRNs = useCallback(async () => {
+    console.log("Loading pending GRNs...");
     setIsLoading(true);
+    setError(null);
     try {
-      const data = await getQCPendingGRNs();
-      // ✅ FIX: API may return envelope object — normalise to array
-      setPendingGRNs(toArray(data, "grns"));
+      const response = await getQCPendingGRNs();
+      console.log("Raw API response:", response);
+      
+      // GRNQCPendingListView returns array directly with GRNReadSerializer
+      // The response should be an array of GRNs
+      let grns = [];
+      if (Array.isArray(response)) {
+        grns = response;
+      } else if (response && typeof response === 'object') {
+        // Handle wrapped responses
+        grns = response.data || response.results || response.grns || [];
+        if (!Array.isArray(grns)) {
+          grns = Object.values(response).find(val => Array.isArray(val)) || [];
+        }
+      }
+      
+      console.log("Processed GRNs:", grns);
+      setPendingGRNs(grns);
+      
+      if (grns.length === 0) {
+        console.log("No pending GRNs found");
+      }
     } catch (error) {
       console.error("Failed to load pending GRNs:", error);
-      toast({ title: "Error", description: "Failed to load pending QC GRNs.", variant: "destructive" });
+      setError(error.message || "Failed to load pending QC GRNs.");
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to load pending QC GRNs.", 
+        variant: "destructive" 
+      });
     } finally {
       setIsLoading(false);
+      console.log("Loading complete");
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadPendingGRNs();
+  }, [loadPendingGRNs]);
+
+  const loadGRNDetails = async (grn) => {
+    console.log("Loading GRN details for:", grn.grn_id);
+    try {
+      // Get GRN items
+      let items = [];
+      try {
+        const itemsResponse = await getGRNItems(grn.grn_id);
+        console.log("Items response:", itemsResponse);
+        
+        if (Array.isArray(itemsResponse)) {
+          items = itemsResponse;
+        } else if (itemsResponse && typeof itemsResponse === 'object') {
+          items = itemsResponse.data || itemsResponse.results || itemsResponse.items || [];
+          if (!Array.isArray(items)) {
+            items = Object.values(itemsResponse).find(val => Array.isArray(val)) || [];
+          }
+        }
+      } catch (error) {
+        console.error("Error loading items:", error);
+        items = [];
+      }
+      
+      // Get GRN summary
+      let summary = null;
+      try {
+        const summaryResponse = await getGRNSummary(grn.grn_id);
+        console.log("Summary response:", summaryResponse);
+        summary = summaryResponse || null;
+      } catch (error) {
+        console.error("Error loading summary:", error);
+        summary = null;
+      }
+      
+      console.log("Loaded items:", items.length);
+      console.log("Loaded summary:", summary);
+      
+      return { items, summary };
+    } catch (error) {
+      console.error("Error loading GRN details:", error);
+      throw error;
     }
   };
 
-  const loadGRNDetails = async (grn) => {
-    const [itemsRes, summaryRes] = await Promise.allSettled([
-      getGRNItems(grn.grn_id),
-      getGRNSummary(grn.grn_id),
-    ]);
-
-    // ✅ FIX: getGRNItems may return { items: [...] } — normalise
-    const items   = itemsRes.status   === "fulfilled" ? toArray(itemsRes.value,   "items")   : [];
-    // ✅ FIX: getGRNSummary returns a plain object { received, accepted, rejected }
-    const summary = summaryRes.status === "fulfilled" ? (summaryRes.value ?? null) : null;
-
-    return { items, summary };
-  };
-
   const handleStartQC = async (grn) => {
+    console.log("Starting QC for GRN:", grn.grn_id);
     setIsLoading(true);
     try {
       const { items, summary } = await loadGRNDetails(grn);
@@ -92,13 +163,18 @@ export default function QualityCheckPage() {
       setQcDialogOpen(true);
     } catch (error) {
       console.error("Failed to load GRN details:", error);
-      toast({ title: "Error", description: "Failed to load GRN details.", variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: "Failed to load GRN details.", 
+        variant: "destructive" 
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleViewGRN = async (grn) => {
+    console.log("Viewing GRN:", grn.grn_id);
     setIsLoading(true);
     try {
       const { items, summary } = await loadGRNDetails(grn);
@@ -108,56 +184,77 @@ export default function QualityCheckPage() {
       setViewDialogOpen(true);
     } catch (error) {
       console.error("Failed to load GRN details:", error);
-      toast({ title: "Error", description: "Failed to load GRN details.", variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: "Failed to load GRN details.", 
+        variant: "destructive" 
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleUpdateQC = async (itemId, acceptedQty, rejectedQty) => {
+    console.log("Updating QC for item:", itemId, { acceptedQty, rejectedQty });
     setIsSubmitting(true);
     try {
-      await updateGRNItem(itemId, {
+      await qcUpdateGRNItem(itemId, {
         accepted_quantity: acceptedQty,
         rejected_quantity: rejectedQty,
       });
-      // Refresh items + summary after update
+      console.log("QC update successful");
+      
+      // Refresh items after update
       const { items, summary } = await loadGRNDetails(selectedGRN);
       setGrnItems(items);
       setGrnSummary(summary);
       toast({ title: "Success", description: "QC updated successfully." });
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Failed to update QC:", error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to update QC.", 
+        variant: "destructive" 
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleFinalApprove = async () => {
+    console.log("Final approving GRN:", selectedGRN?.grn_id);
     setIsSubmitting(true);
     try {
       await approveGRN(selectedGRN.grn_id);
-      toast({ title: "Success", description: "GRN approved and inventory updated." });
+      console.log("GRN approved successfully");
+      toast({ 
+        title: "Success", 
+        description: "GRN approved and inventory updated." 
+      });
       setQcDialogOpen(false);
-      loadPendingGRNs();
+      await loadPendingGRNs(); // Refresh the list
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Failed to approve GRN:", error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to approve GRN.", 
+        variant: "destructive" 
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const allItemsQCd = grnItems.length > 0 &&
+    grnItems.every((item) => item.qc_status === "Completed");
+  const pendingCount = grnItems.filter((i) => i.qc_status !== "Completed").length;
+
   const q = search.toLowerCase();
-  // ✅ FIX: grn_id and po_id are integers — use matchesSearch for safe coercion
   const filtered = pendingGRNs.filter(
     (grn) =>
       matchesSearch(grn.grn_id, q) ||
-      matchesSearch(grn.po?.po_id, q)
-  );
-
-  // "Approve" button is enabled only when every item has at least some QC quantity entered
-  const allItemsQCCompleted = grnItems.length > 0 && grnItems.every(
-    (item) => (item.accepted_quantity ?? 0) > 0 || (item.rejected_quantity ?? 0) > 0
+      matchesSearch(grn.po_id, q) ||
+      matchesSearch(grn.grn_number, q)
   );
 
   const SummaryBanner = ({ summary }) =>
@@ -178,18 +275,69 @@ export default function QualityCheckPage() {
       </div>
     ) : null;
 
+  // Show loading state
+  if (isLoading && pendingGRNs.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Quality Check</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Inspect received goods and update acceptance/rejection quantities
+          </p>
+        </div>
+        <Card className="p-8 text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="mt-4 text-muted-foreground">Loading pending GRNs...</p>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error && !isLoading) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Quality Check</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Inspect received goods and update acceptance/rejection quantities
+          </p>
+        </div>
+        <Card className="p-8 text-center">
+          <div className="text-red-600 mb-4">{error}</div>
+          <Button onClick={loadPendingGRNs}>Retry</Button>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Quality Check</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Inspect received goods and update acceptance/rejection quantities
+        </p>
+      </div>
+
       <div className="flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search GRN..."
+            placeholder="Search GRN, PO or GRN number..."
             className="pl-9 h-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Button 
+          variant="outline" 
+          onClick={loadPendingGRNs}
+          disabled={isLoading}
+          size="sm"
+        >
+          Refresh
+        </Button>
       </div>
 
       <Card className="shadow-sm overflow-hidden">
@@ -198,10 +346,10 @@ export default function QualityCheckPage() {
             <TableHeader>
               <TableRow className="bg-muted/50">
                 <TableHead className="text-xs font-semibold">GRN ID</TableHead>
+                <TableHead className="text-xs font-semibold">GRN Number</TableHead>
                 <TableHead className="text-xs font-semibold">PO Reference</TableHead>
-                <TableHead className="text-xs font-semibold">Vendor</TableHead>
-                <TableHead className="text-xs font-semibold text-center">Items</TableHead>
                 <TableHead className="text-xs font-semibold">Receipt Date</TableHead>
+                <TableHead className="text-xs font-semibold">Received By</TableHead>
                 <TableHead className="text-xs font-semibold">Status</TableHead>
                 <TableHead className="text-xs font-semibold text-right">Actions</TableHead>
               </TableRow>
@@ -211,12 +359,15 @@ export default function QualityCheckPage() {
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mt-2">Loading GRNs...</p>
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No pending QC GRNs found
+                    {pendingGRNs.length === 0 
+                      ? "No pending QC GRNs found" 
+                      : "No matching GRNs found"}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -225,14 +376,12 @@ export default function QualityCheckPage() {
                     <TableCell className="text-xs font-mono font-bold text-primary">
                       {grn.grn_id}
                     </TableCell>
-                    <TableCell className="text-xs font-mono">{grn.po?.po_id || "-"}</TableCell>
-                    <TableCell className="text-sm">{grn.po?.vendor?.vendor_name || "-"}</TableCell>
-                    <TableCell className="text-sm text-center">
-                      {grn.items?.length ?? 0}
-                    </TableCell>
+                    <TableCell className="text-xs">{grn.grn_number || "-"}</TableCell>
+                    <TableCell className="text-xs font-mono">{grn.po_id || "-"}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {grn.receipt_date ? new Date(grn.receipt_date).toLocaleDateString() : "-"}
                     </TableCell>
+                    <TableCell className="text-xs">{grn.received_by_username || "-"}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs uppercase">
                         QC Pending
@@ -270,7 +419,7 @@ export default function QualityCheckPage() {
           <DialogHeader>
             <DialogTitle>QC Inspection: {selectedGRN?.grn_id}</DialogTitle>
             <DialogDescription>
-              Enter accepted and rejected quantities for each item
+              Save each item individually, then click Approve when all are done.
             </DialogDescription>
           </DialogHeader>
 
@@ -290,7 +439,8 @@ export default function QualityCheckPage() {
               {grnItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-6 text-muted-foreground text-sm">
-                    No items found for this GRN
+                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                    <p className="mt-2">Loading items...</p>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -307,13 +457,17 @@ export default function QualityCheckPage() {
           </Table>
 
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setQcDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setQcDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={handleFinalApprove}
-              disabled={isSubmitting || !allItemsQCCompleted}
+              disabled={isSubmitting || !allItemsQCd}
             >
               {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Approve & Update Inventory
+              {allItemsQCd
+                ? "Approve & Update Inventory"
+                : `Approve (${pendingCount} item${pendingCount !== 1 ? "s" : ""} pending)`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -324,6 +478,9 @@ export default function QualityCheckPage() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>GRN Details: {selectedGRN?.grn_id}</DialogTitle>
+            <DialogDescription>
+              Complete details of the Goods Received Note including all items and QC status.
+            </DialogDescription>
           </DialogHeader>
 
           <SummaryBanner summary={grnSummary} />
@@ -342,7 +499,7 @@ export default function QualityCheckPage() {
               {grnItems.map((item) => (
                 <TableRow key={item.grn_item_id}>
                   <TableCell className="text-sm font-medium">
-                    {item.product?.product_name ?? "-"}
+                    {item.product_name ?? "-"}
                   </TableCell>
                   <TableCell className="text-right">{item.received_quantity ?? 0}</TableCell>
                   <TableCell className="text-right text-green-600">
@@ -365,7 +522,9 @@ export default function QualityCheckPage() {
           </Table>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -373,33 +532,29 @@ export default function QualityCheckPage() {
   );
 }
 
-// ─── QC Item Row ─────────────────────────────────────────────────────────────
+// QC Item Row Component
 function QCItemRow({ item, onUpdate, isSubmitting }) {
   const [acceptedQty, setAcceptedQty] = useState(item.accepted_quantity ?? 0);
   const [rejectedQty, setRejectedQty] = useState(item.rejected_quantity ?? 0);
 
+  const received = item.received_quantity ?? 0;
+  const isOverLimit = acceptedQty + rejectedQty > received;
+  const completed = item.qc_status === "Completed";
+
   const handleSave = () => {
-    const received = item.received_quantity ?? 0;
-    if (acceptedQty + rejectedQty > received) {
-      alert(`Accepted + Rejected (${acceptedQty + rejectedQty}) cannot exceed Received (${received})`);
-      return;
-    }
+    if (isOverLimit) return;
     onUpdate(item.grn_item_id, acceptedQty, rejectedQty);
   };
 
-  const completed = item.qc_status === "Completed";
-
   return (
     <TableRow>
-      <TableCell className="text-sm font-medium">
-        {item.product?.product_name ?? "-"}
-      </TableCell>
-      <TableCell className="text-right">{item.received_quantity ?? 0}</TableCell>
+      <TableCell className="text-sm font-medium">{item.product_name ?? "-"}</TableCell>
+      <TableCell className="text-right">{received}</TableCell>
       <TableCell className="text-right">
         <Input
           type="number"
           min="0"
-          max={item.received_quantity ?? 0}
+          max={received}
           value={acceptedQty}
           onChange={(e) => setAcceptedQty(parseInt(e.target.value) || 0)}
           className="w-24 text-right"
@@ -410,18 +565,26 @@ function QCItemRow({ item, onUpdate, isSubmitting }) {
         <Input
           type="number"
           min="0"
-          max={item.received_quantity ?? 0}
+          max={received}
           value={rejectedQty}
           onChange={(e) => setRejectedQty(parseInt(e.target.value) || 0)}
-          className="w-24 text-right"
+          className={`w-24 text-right ${isOverLimit ? "border-red-400" : ""}`}
           disabled={completed}
         />
+        {isOverLimit && (
+          <p className="text-xs text-red-500 mt-1">Exceeds received ({received})</p>
+        )}
       </TableCell>
       <TableCell className="text-center">
         {completed ? (
           <Badge variant="secondary">Completed</Badge>
         ) : (
-          <Button size="sm" variant="outline" onClick={handleSave} disabled={isSubmitting}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSave}
+            disabled={isSubmitting || isOverLimit}
+          >
             Save
           </Button>
         )}

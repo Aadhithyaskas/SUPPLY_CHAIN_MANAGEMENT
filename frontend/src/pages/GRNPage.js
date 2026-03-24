@@ -4,7 +4,7 @@ import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, Eye, CheckCircle, Loader2, XCircle } from "lucide-react";
+import { Plus, Search, Eye, CheckCircle, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,40 +20,46 @@ import {
   listGRNs,
   getGRN,
   getGRNItems,
-  updateGRNItem,
+  qcUpdateGRNItem,
   approveGRN,
   getQCPendingGRNs,
   getMyGRNs,
   getGRNSummary,
   listASN,
   listPurchaseOrders,
+  createGRNBySupervisor,
 } from "../services/apiService";
 import { useToast } from "../components/ui/use-toast";
 
 const statusMap = {
-  RECEIVED: { label: "Received", variant: "outline" },
-  QC_PENDING: { label: "QC Pending", variant: "warning" },
-  COMPLETED: { label: "Completed", variant: "secondary" },
+  RECEIVED:   { label: "Received",   variant: "outline"   },
+  QC_PENDING: { label: "QC Pending", variant: "warning"   },
+  COMPLETED:  { label: "Completed",  variant: "secondary" },
 };
 
 export default function GRNPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+
   const [search, setSearch] = useState("");
   const [grns, setGrns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [qcDialogOpen, setQcDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
   const [selectedGRN, setSelectedGRN] = useState(null);
   const [grnItems, setGrnItems] = useState([]);
   const [grnSummary, setGrnSummary] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [asnList, setAsnList] = useState([]);
   const [poList, setPoList] = useState([]);
   const [newGRN, setNewGRN] = useState({
-    po_id: "",
-    asn_id: "",
+    grn_number: "",
+    po: "",
+    asn: "",
     receipt_date: "",
   });
 
@@ -66,13 +72,15 @@ export default function GRNPage() {
     loadPOs();
   }, []);
 
+  // ── Loaders ────────────────────────────────────────────────────────────────
+
   const loadGRNs = async () => {
     setIsLoading(true);
     try {
       let data;
       if (isSupervisor) {
-        data = await getMyGRNs();
-        data = data.data || [];
+        const res = await getMyGRNs();
+        data = res.data || [];
       } else if (isQC) {
         data = await getQCPendingGRNs();
       } else {
@@ -81,11 +89,7 @@ export default function GRNPage() {
       setGrns(data);
     } catch (error) {
       console.error("Failed to load GRNs:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load GRNs.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to load GRNs.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -109,54 +113,58 @@ export default function GRNPage() {
     }
   };
 
+  // ── View dialog ────────────────────────────────────────────────────────────
+
   const handleViewGRN = async (grnId) => {
     setIsLoading(true);
     try {
-      const grn = await getGRN(grnId);
-      const items = await getGRNItems(grnId);
-      const summary = await getGRNSummary(grnId);
+      const [grn, items, summary] = await Promise.all([
+        getGRN(grnId),
+        getGRNItems(grnId),
+        getGRNSummary(grnId),
+      ]);
       setSelectedGRN(grn);
       setGrnItems(items);
       setGrnSummary(summary);
       setViewDialogOpen(true);
     } catch (error) {
       console.error("Failed to load GRN details:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load GRN details.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to load GRN details.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleQCApprove = (grn) => {
+  // ── QC dialog ──────────────────────────────────────────────────────────────
+
+  // FIX: was only setSelectedGRN — never fetched items, so table was always empty
+  const handleOpenQCDialog = async (grn) => {
     setSelectedGRN(grn);
+    setGrnItems([]);
     setQcDialogOpen(true);
+    try {
+      const items = await getGRNItems(grn.grn_id);
+      setGrnItems(items);
+    } catch (error) {
+      console.error("Failed to load GRN items:", error);
+      toast({ title: "Error", description: "Failed to load GRN items.", variant: "destructive" });
+    }
   };
 
+  // FIX: was calling generic updateGRNItem — now calls qcUpdateGRNItem (QC-specific endpoint)
   const handleQCUpdate = async (grnItemId, acceptedQty, rejectedQty) => {
     setIsSubmitting(true);
     try {
-      await updateGRNItem(grnItemId, {
+      await qcUpdateGRNItem(grnItemId, {
         accepted_quantity: acceptedQty,
         rejected_quantity: rejectedQty,
       });
-      toast({
-        title: "Success",
-        description: "QC updated successfully.",
-      });
-      // Refresh items
+      toast({ title: "Success", description: "QC saved." });
       const items = await getGRNItems(selectedGRN.grn_id);
       setGrnItems(items);
     } catch (error) {
       console.error("Failed to update QC:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update QC.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to save QC.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -166,52 +174,59 @@ export default function GRNPage() {
     setIsSubmitting(true);
     try {
       await approveGRN(selectedGRN.grn_id);
-      toast({
-        title: "Success",
-        description: "GRN approved and inventory updated.",
-      });
+      toast({ title: "Success", description: "GRN approved and inventory updated." });
       setQcDialogOpen(false);
       loadGRNs();
     } catch (error) {
       console.error("Failed to approve GRN:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to approve GRN.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to approve GRN.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // ── Create GRN dialog ──────────────────────────────────────────────────────
+
+  // FIX: was a stub — now calls the real supervisor endpoint
   const handleCreateGRN = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // Create GRN via supervisor endpoint
-      toast({
-        title: "Info",
-        description: "Create GRN endpoint coming soon.",
+      await createGRNBySupervisor({
+        grn_number: newGRN.grn_number,
+        po: newGRN.po,
+        asn: newGRN.asn || null,
+        receipt_date: newGRN.receipt_date,
       });
+      toast({ title: "Success", description: "GRN created successfully." });
       setCreateDialogOpen(false);
+      setNewGRN({ grn_number: "", po: "", asn: "", receipt_date: "" });
       loadGRNs();
     } catch (error) {
       console.error("Failed to create GRN:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create GRN.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to create GRN.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filteredGRNs = grns.filter(
-    (grn) =>
-      grn.grn_id?.toLowerCase().includes(search.toLowerCase()) ||
-      grn.po?.po_id?.toLowerCase().includes(search.toLowerCase())
-  );
+  // ── Search filter ──────────────────────────────────────────────────────────
+
+  const filteredGRNs = grns.filter((grn) => {
+    const q = search.toLowerCase();
+    return (
+      grn.grn_id?.toLowerCase().includes(q) ||
+      grn.po_id?.toLowerCase().includes(q) ||        // GRNReadSerializer returns po_id (string)
+      grn.grn_number?.toLowerCase().includes(q)
+    );
+  });
+
+  // FIX: all items must be QC'd before final approve is enabled
+  const allItemsQCd =
+    grnItems.length > 0 && grnItems.every((i) => i.qc_status === "Completed");
+  const pendingCount = grnItems.filter((i) => i.qc_status !== "Completed").length;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
@@ -224,14 +239,18 @@ export default function GRNPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search GRN or PO..."
+            placeholder="Search GRN, PO or GRN number..."
             className="pl-9 h-9 border-gray-200"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         {isSupervisor && (
-          <Button size="sm" className="h-9 bg-[#1E3A8A] hover:bg-[#1E293B]" onClick={() => setCreateDialogOpen(true)}>
+          <Button
+            size="sm"
+            className="h-9 bg-[#1E3A8A] hover:bg-[#1E293B]"
+            onClick={() => setCreateDialogOpen(true)}
+          >
             <Plus className="w-4 h-4 mr-1.5" /> New GRN Entry
           </Button>
         )}
@@ -242,6 +261,7 @@ export default function GRNPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
+                <TableHead className="text-xs font-semibold text-gray-600">GRN ID</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600">GRN Number</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600">PO Reference</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600">ASN Reference</TableHead>
@@ -254,13 +274,13 @@ export default function GRNPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#1E3A8A]" />
                   </TableCell>
                 </TableRow>
               ) : filteredGRNs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                     No GRNs found
                   </TableCell>
                 </TableRow>
@@ -270,15 +290,16 @@ export default function GRNPage() {
                     <TableCell className="text-xs font-mono font-bold text-[#1E3A8A]">
                       {grn.grn_id}
                     </TableCell>
-                    <TableCell className="text-xs font-mono text-gray-600">{grn.po?.po_id || "-"}</TableCell>
-                    <TableCell className="text-xs font-mono text-gray-500">
-                      {grn.asn?.asn_id || "-"}
-                    </TableCell>
+                    <TableCell className="text-xs text-gray-600">{grn.grn_number || "-"}</TableCell>
+                    {/* FIX: GRNReadSerializer returns po_id (flat string), not po.po_id (nested object) */}
+                    <TableCell className="text-xs font-mono text-gray-600">{grn.po_id || "-"}</TableCell>
+                    <TableCell className="text-xs font-mono text-gray-500">{grn.asn_id || "-"}</TableCell>
                     <TableCell className="text-xs text-gray-500">
                       {grn.receipt_date ? new Date(grn.receipt_date).toLocaleDateString() : "-"}
                     </TableCell>
                     <TableCell className="text-xs text-gray-600">
-                      {grn.received_by?.username || "-"}
+                      {/* FIX: GRNReadSerializer returns received_by_username (flat string) */}
+                      {grn.received_by_username || "-"}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -299,7 +320,7 @@ export default function GRNPage() {
                         </button>
                         {isQC && grn.status === "QC_PENDING" && (
                           <button
-                            onClick={() => handleQCApprove(grn)}
+                            onClick={() => handleOpenQCDialog(grn)}
                             className="p-1.5 rounded hover:bg-green-50 transition-colors"
                             title="QC Approve"
                           >
@@ -316,13 +337,13 @@ export default function GRNPage() {
         </div>
       </Card>
 
-      {/* View GRN Dialog */}
+      {/* ── View GRN Dialog ── */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>GRN Details: {selectedGRN?.grn_id}</DialogTitle>
             <DialogDescription>
-              PO: {selectedGRN?.po?.po_id} | Status: {selectedGRN?.status}
+              PO: {selectedGRN?.po_id} | Status: {selectedGRN?.status}
             </DialogDescription>
           </DialogHeader>
 
@@ -356,8 +377,9 @@ export default function GRNPage() {
             <TableBody>
               {grnItems.map((item) => (
                 <TableRow key={item.grn_item_id}>
+                  {/* FIX: GRNItemReadSerializer returns product_name (flat), not product.product_name */}
                   <TableCell className="text-sm font-medium text-gray-900">
-                    {item.product?.product_name}
+                    {item.product_name}
                   </TableCell>
                   <TableCell className="text-right text-gray-700">{item.received_quantity}</TableCell>
                   <TableCell className="text-right text-green-600">{item.accepted_quantity || 0}</TableCell>
@@ -383,13 +405,13 @@ export default function GRNPage() {
         </DialogContent>
       </Dialog>
 
-      {/* QC Approval Dialog */}
+      {/* ── QC Approval Dialog ── */}
       <Dialog open={qcDialogOpen} onOpenChange={setQcDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>QC Approval: {selectedGRN?.grn_id}</DialogTitle>
             <DialogDescription>
-              Update accepted and rejected quantities for each item.
+              Fill accepted and rejected quantities, then save each item before final approval.
             </DialogDescription>
           </DialogHeader>
 
@@ -404,14 +426,22 @@ export default function GRNPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {grnItems.map((item) => (
-                <QCItemRow
-                  key={item.grn_item_id}
-                  item={item}
-                  onUpdate={handleQCUpdate}
-                  isSubmitting={isSubmitting}
-                />
-              ))}
+              {grnItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-6 text-gray-400">
+                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                grnItems.map((item) => (
+                  <QCItemRow
+                    key={item.grn_item_id}
+                    item={item}
+                    onUpdate={handleQCUpdate}
+                    isSubmitting={isSubmitting}
+                  />
+                ))
+              )}
             </TableBody>
           </Table>
 
@@ -419,31 +449,50 @@ export default function GRNPage() {
             <Button variant="outline" onClick={() => setQcDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleFinalApprove} disabled={isSubmitting} className="bg-[#1E3A8A] hover:bg-[#1E293B]">
+            {/* FIX: disabled until every item is saved */}
+            <Button
+              onClick={handleFinalApprove}
+              disabled={isSubmitting || !allItemsQCd}
+              className="bg-[#1E3A8A] hover:bg-[#1E293B]"
+            >
               {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Final Approve & Update Inventory
+              {allItemsQCd
+                ? "Final Approve & Update Inventory"
+                : `Final Approve (${pendingCount} item${pendingCount !== 1 ? "s" : ""} pending)`}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Create GRN Dialog */}
+      {/* ── Create GRN Dialog ── */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent>
           <form onSubmit={handleCreateGRN}>
             <DialogHeader>
               <DialogTitle>Create New GRN</DialogTitle>
               <DialogDescription>
-                Select PO and ASN to create a Goods Received Note.
+                Fill in the details to create a Goods Received Note.
               </DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-4 py-4">
+
+              <div className="grid gap-2">
+                <Label className="text-sm font-medium text-gray-700">GRN Number</Label>
+                <Input
+                  placeholder="e.g. GRN-VND-2024-001"
+                  value={newGRN.grn_number}
+                  onChange={(e) => setNewGRN({ ...newGRN, grn_number: e.target.value })}
+                  required
+                  className="border-gray-200"
+                />
+              </div>
+
               <div className="grid gap-2">
                 <Label className="text-sm font-medium text-gray-700">Purchase Order</Label>
                 <Select
-                  value={newGRN.po_id}
-                  onValueChange={(value) => setNewGRN({ ...newGRN, po_id: value })}
+                  value={newGRN.po}
+                  onValueChange={(value) => setNewGRN({ ...newGRN, po: value })}
                   required
                 >
                   <SelectTrigger className="border-gray-200">
@@ -452,7 +501,7 @@ export default function GRNPage() {
                   <SelectContent>
                     {poList.map((po) => (
                       <SelectItem key={po.po_id} value={po.po_id}>
-                        {po.po_id} - ₹{po.total_amount}
+                        {po.po_id} — ₹{po.total_amount}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -462,8 +511,8 @@ export default function GRNPage() {
               <div className="grid gap-2">
                 <Label className="text-sm font-medium text-gray-700">ASN (Optional)</Label>
                 <Select
-                  value={newGRN.asn_id}
-                  onValueChange={(value) => setNewGRN({ ...newGRN, asn_id: value })}
+                  value={newGRN.asn}
+                  onValueChange={(value) => setNewGRN({ ...newGRN, asn: value })}
                 >
                   <SelectTrigger className="border-gray-200">
                     <SelectValue placeholder="Select ASN" />
@@ -471,7 +520,7 @@ export default function GRNPage() {
                   <SelectContent>
                     {asnList.map((asn) => (
                       <SelectItem key={asn.asn_id} value={asn.asn_id}>
-                        {asn.asn_id} - {asn.vendor?.vendor_name}
+                        {asn.asn_id} — {asn.vendor_name || asn.vendor}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -491,10 +540,18 @@ export default function GRNPage() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateDialogOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-[#1E3A8A] hover:bg-[#1E293B]">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="bg-[#1E3A8A] hover:bg-[#1E293B]"
+              >
                 {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Create GRN
               </Button>
@@ -506,22 +563,26 @@ export default function GRNPage() {
   );
 }
 
-// QC Item Row Component
+// ── QC Item Row ────────────────────────────────────────────────────────────────
+
 function QCItemRow({ item, onUpdate, isSubmitting }) {
   const [acceptedQty, setAcceptedQty] = useState(item.accepted_quantity || 0);
   const [rejectedQty, setRejectedQty] = useState(item.rejected_quantity || 0);
 
+  const total = acceptedQty + rejectedQty;
+  const isOverLimit = total > item.received_quantity;
+
   const handleSave = () => {
-    if (acceptedQty + rejectedQty > item.received_quantity) {
-      alert("Accepted + Rejected cannot exceed Received quantity");
-      return;
-    }
+    if (isOverLimit) return;
     onUpdate(item.grn_item_id, acceptedQty, rejectedQty);
   };
 
+  const isCompleted = item.qc_status === "Completed";
+
   return (
     <TableRow>
-      <TableCell className="text-sm font-medium text-gray-900">{item.product?.product_name}</TableCell>
+      {/* FIX: use flat product_name from GRNItemReadSerializer */}
+      <TableCell className="text-sm font-medium text-gray-900">{item.product_name}</TableCell>
       <TableCell className="text-right text-gray-700">{item.received_quantity}</TableCell>
       <TableCell className="text-right">
         <Input
@@ -531,7 +592,7 @@ function QCItemRow({ item, onUpdate, isSubmitting }) {
           value={acceptedQty}
           onChange={(e) => setAcceptedQty(parseInt(e.target.value) || 0)}
           className="w-24 text-right border-gray-200"
-          disabled={item.qc_status === "Completed"}
+          disabled={isCompleted}
         />
       </TableCell>
       <TableCell className="text-right">
@@ -541,26 +602,29 @@ function QCItemRow({ item, onUpdate, isSubmitting }) {
           max={item.received_quantity}
           value={rejectedQty}
           onChange={(e) => setRejectedQty(parseInt(e.target.value) || 0)}
-          className="w-24 text-right border-gray-200"
-          disabled={item.qc_status === "Completed"}
+          className={`w-24 text-right border-gray-200 ${isOverLimit ? "border-red-400" : ""}`}
+          disabled={isCompleted}
         />
+        {/* inline validation hint */}
+        {isOverLimit && (
+          <p className="text-xs text-red-500 mt-1">
+            Exceeds received ({item.received_quantity})
+          </p>
+        )}
       </TableCell>
       <TableCell className="text-center">
-        {item.qc_status !== "Completed" && (
+        {isCompleted ? (
+          <Badge variant="secondary" className="text-xs">Completed</Badge>
+        ) : (
           <Button
             size="sm"
             variant="outline"
             onClick={handleSave}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isOverLimit}
             className="border-gray-200"
           >
             Save
           </Button>
-        )}
-        {item.qc_status === "Completed" && (
-          <Badge variant="secondary" className="text-xs">
-            Completed
-          </Badge>
         )}
       </TableCell>
     </TableRow>

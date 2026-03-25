@@ -10,20 +10,23 @@ import { AppLayout } from "./components/AppLayout";
 // Pages
 import UsersPage from "./pages/UsersPage";
 import ProductsPage from "./pages/ProductsPage";
+import CreateEditProductPage from "./pages/CreateEditProductPage";
+//import AddProductPage from "./pages/AddProductPage";
 import DashboardPage from "./pages/DashboardPage";
 import InventoryPage from "./pages/InventoryPage";
 import PurchaseRequestsPage from "./pages/PurchaseRequestsPage";
 import ASNPage from "./pages/ASNPage";
 import GRNPage from "./pages/GRNPage";
 import SuppliersPage from "./pages/SuppliersPage";
+import AddSupplierPage from "./pages/AddSupplierPage";
 import WarehousesPage from "./pages/WarehousesPage";
 import OutboundPage from "./pages/OutboundPage";
 import QualityCheckPage from "./pages/QualityCheckPage";
 import FinancePage from "./pages/FinancePage";
 import SettingsPage from "./pages/SettingsPage";
 import VendorsPage from "./pages/VendorsPage";
-//import CreateVendorPage from "./pages/CreateVendorPage";
 import CreateVendorPage from "./pages/CreateVendorPage";
+
 
 // Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
@@ -74,14 +77,18 @@ const App = () => (
             >
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/products" element={<ProductsPage />} />
+              <Route path="/products/create" element={<CreateEditProductPage />} />
+              <Route path="/products/edit/:id" element={<CreateEditProductPage />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/purchase-requests" element={<PurchaseRequestsPage />} />
               <Route path="/asn" element={<ASNPage />} />
               <Route path="/grn" element={<GRNPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
+              <Route path="/suppliers/create" element={<AddSupplierPage />} />
               <Route path="/vendors" element={<VendorsPage />} />
               <Route path="/vendors/create" element={<CreateVendorPage />} />
+              <Route path="/vendors/edit/:id" element={< CreateVendorPage/>} />      
               <Route path="/warehouses" element={<WarehousesPage />} />
               <Route path="/outbound" element={<OutboundPage />} />
               <Route path="/quality-check" element={<QualityCheckPage />} />

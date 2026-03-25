@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -50,9 +51,9 @@ const EMPTY_FORM = {
   country: "",
 };
 
-// ✅ No <AppLayout> — layout is provided by the router via <Outlet>
 export default function SuppliersPage() {
   const { toast } = useToast();
+  const navigate = useNavigate(); // ✅ ADDED
   const [search, setSearch] = useState("");
   const [suppliers, setSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +71,6 @@ export default function SuppliersPage() {
     setIsLoading(true);
     try {
       const data = await listSuppliers();
-      // ✅ FIX: API may return { suppliers: [...] } or { results: [...] } — not a bare array
       setSuppliers(toArray(data, "suppliers"));
     } catch (error) {
       console.error("Failed to load suppliers:", error);
@@ -84,20 +84,13 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleOpenCreate = () => {
-    setDialogMode("create");
-    setFormData(EMPTY_FORM);
-    setSelectedSupplier(null);
-    setDialogOpen(true);
-  };
-
   const handleOpenEdit = async (supplierId) => {
     setIsLoading(true);
     try {
       const supplier = await getSupplier(supplierId);
       setSelectedSupplier(supplier);
       setFormData({
-        supplier_name:     supplier.supplier_name ?? "",
+        supplier_name:      supplier.supplier_name ?? "",
         contact_personname: supplier.contact_personname ?? "",
         email:   supplier.email   ?? "",
         phone:   supplier.phone   ?? "",
@@ -135,10 +128,7 @@ export default function SuppliersPage() {
     e?.preventDefault();
     setIsSubmitting(true);
     try {
-      if (dialogMode === "create") {
-        await createSupplier(formData);
-        toast({ title: "Success", description: "Supplier created successfully." });
-      } else if (dialogMode === "edit") {
+      if (dialogMode === "edit") {
         await updateSupplier(selectedSupplier.supplier_id, formData);
         toast({ title: "Success", description: "Supplier updated successfully." });
       } else if (dialogMode === "delete") {
@@ -160,7 +150,6 @@ export default function SuppliersPage() {
   };
 
   const q = search.toLowerCase();
-  // ✅ FIX: supplier_id is an integer from Django — coerce safely instead of calling .toLowerCase()
   const filteredSuppliers = suppliers.filter(
     (s) =>
       matchesSearch(s.supplier_name, q) ||
@@ -179,7 +168,8 @@ export default function SuppliersPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button size="sm" className="h-9" onClick={handleOpenCreate}>
+        {/* ✅ CHANGED: navigate to create page instead of opening dialog */}
+        <Button size="sm" className="h-9" onClick={() => navigate("/suppliers/create")}>
           <Plus className="w-4 h-4 mr-1.5" /> Add Supplier
         </Button>
       </div>
@@ -257,22 +247,16 @@ export default function SuppliersPage() {
         </div>
       </Card>
 
-      {/* Create / Edit Dialog */}
+      {/* Edit Dialog */}
       <Dialog
-        open={dialogOpen && (dialogMode === "create" || dialogMode === "edit")}
+        open={dialogOpen && dialogMode === "edit"}
         onOpenChange={setDialogOpen}
       >
         <DialogContent className="sm:max-w-[500px]">
           <form onSubmit={handleSubmit}>
             <DialogHeader>
-              <DialogTitle>
-                {dialogMode === "create" ? "Add New Supplier" : "Edit Supplier"}
-              </DialogTitle>
-              <DialogDescription>
-                {dialogMode === "create"
-                  ? "Fill in the supplier details below."
-                  : "Update the supplier information."}
-              </DialogDescription>
+              <DialogTitle>Edit Supplier</DialogTitle>
+              <DialogDescription>Update the supplier information.</DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-4 py-4">
@@ -328,7 +312,7 @@ export default function SuppliersPage() {
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {dialogMode === "create" ? "Create Supplier" : "Save Changes"}
+                Save Changes
               </Button>
             </DialogFooter>
           </form>

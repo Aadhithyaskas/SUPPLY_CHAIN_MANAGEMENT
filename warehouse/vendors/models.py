@@ -1,6 +1,5 @@
 from django.db import models
 
-
 class Warehouse(models.Model):
 
     warehouse_id = models.CharField(

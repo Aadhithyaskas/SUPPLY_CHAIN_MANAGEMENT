@@ -12,5 +12,6 @@ urlpatterns = [
     path('update/<str:product_id>/', UpdateProductView.as_view()),
 
     path('delete/<str:product_id>/', DeleteProductView.as_view()),
-
+    
+    path('process-vendor-invoice/', ProcessVendorInvoiceView.as_view()),
 ]

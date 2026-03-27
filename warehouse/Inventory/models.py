@@ -4,16 +4,40 @@ from products.models import Product
 from vendors.models import Vendor
 
 
-class Inventory(models.Model):
+class Zone(models.Model):
+    zone_id = models.CharField(primary_key=True, max_length=10)
+    zone_type = models.CharField(max_length=20)  
 
-    inventory_id = models.CharField(max_length=10, primary_key=True, editable=False)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="inventories")
-    zone_name = models.CharField(max_length=3)
-    shelf_name = models.CharField(max_length=3)
-    rack_name = models.CharField(max_length=3)
-    bin_name = models.CharField(max_length=3)
+class Rack(models.Model):
+    rack_id = models.CharField(primary_key=True, max_length=10)
+    zone = models.ForeignKey(Zone, on_delete=models.CASCADE)
+
+class Shelf(models.Model):
+    shelf_id = models.CharField(primary_key=True, max_length=10)
+    rack = models.ForeignKey(Rack, on_delete=models.CASCADE)
+
+class Bin(models.Model):
+    bin_id = models.CharField(primary_key=True, max_length=10)
+    shelf = models.ForeignKey(Shelf, on_delete=models.CASCADE)
+    
+    capacity = models.IntegerField()
+    current_load = models.IntegerField(default=0)
+
+    distance_from_dispatch = models.FloatField()
+
+    pick_count = models.IntegerField(default=0)
+    last_picked_at = models.DateTimeField(null=True, blank=True)
+
+class Inventory(models.Model):
+    
+    inventory_id = models.CharField(max_length=10, primary_key=True)
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+
+    bin = models.ForeignKey(Bin, on_delete=models.CASCADE)
+
     quantity = models.IntegerField(default=0)
-    last_update = models.DateTimeField(auto_now=True)
+
 
     def save(self, *args, **kwargs):
         if not self.inventory_id:
@@ -74,7 +98,19 @@ class PurchaseOrder(models.Model):
                 self.po_id = f"PO{new_id:04d}"
         super().save(*args, **kwargs)
 
+class StockMovement(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    bin = models.ForeignKey(Bin, on_delete=models.CASCADE)
 
+    movement_type = models.CharField(max_length=20)  # INBOUND / OUTBOUND
+
+    quantity = models.IntegerField()
+
+    previous_stock = models.IntegerField()
+    new_stock = models.IntegerField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    
 class ASN(models.Model):
 
     asn_id = models.CharField(max_length=10, primary_key=True, editable=False)
@@ -177,3 +213,4 @@ class GRNItem(models.Model):
                 new_id = (int(last.grn_item_id.split('-')[-1]) + 1) if last else 1
                 self.grn_item_id = f"GRN-ITM-{new_id:04d}"
         super().save(*args, **kwargs)
+

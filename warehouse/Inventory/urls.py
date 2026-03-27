@@ -47,4 +47,5 @@ urlpatterns = [
     path("grn-items-list/", GRNItemListView.as_view()),
     path("grn-item/<str:pk>/qc/", QCUpdateGRNItem.as_view()),  # ✅ specific first
     path("grn-item/<str:pk>/", GRNItemDetailView.as_view()),   # ✅ dynamic last
+    path("outbound/pick/<str:product_id>/", OptimizedOutboundView.as_view()),
 ]

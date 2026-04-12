@@ -11,6 +11,7 @@ export function AppLayout() {
 
   const getTitle = () => {
     const path = location.pathname;
+    if (path.includes("upload-agreement"))  return "Upload Vendor Agreement";
     if (path.includes("dashboard"))         return "Dashboard";
     if (path.includes("users"))             return "User Management";
     if (path.includes("products"))          return "Products";
@@ -19,6 +20,7 @@ export function AppLayout() {
     if (path.includes("asn"))               return "ASN";
     if (path.includes("grn"))               return "GRN";
     if (path.includes("suppliers"))         return "Suppliers";
+    if (path.includes("vendors"))           return "Vendors";
     if (path.includes("warehouses"))        return "Warehouses";
     if (path.includes("outbound"))          return "Outbound Orders";
     if (path.includes("quality-check"))     return "Quality Check";

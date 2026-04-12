@@ -40,31 +40,41 @@ export default function SettingsPage() {
     setIsLoading(true);
     try {
       const data = await getWarehouse();
-
       if (data) {
         setWarehouse({
-          warehouse_name: data?.warehouse_name ?? "",
+          warehouse_name:  data?.warehouse_name  ?? "",
           warehouse_email: data?.warehouse_email ?? "",
           warehouse_phone: data?.warehouse_phone ?? "",
-          address: data?.address ?? "",
+          address:         data?.address         ?? "",
         });
         setIsNew(false);
       } else {
         setIsNew(true);
       }
     } catch (error) {
-      console.error("Failed to load warehouse:", error);
-      setIsNew(true);
+      // 404 = no warehouse exists yet (expected after fresh install / DB flush).
+      // Silently fall into create mode without showing an error toast.
+      const isNotFound =
+        error.message?.toLowerCase().includes("not created") ||
+        error.message?.toLowerCase().includes("not found") ||
+        error.message?.includes("404");
 
-      toast({
-        title: "Error",
-        description: "Failed to load warehouse settings.",
-        variant: "destructive",
-      });
+      if (isNotFound) {
+        setIsNew(true);
+      } else {
+        console.error("Failed to load warehouse:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load warehouse settings.",
+          variant: "destructive",
+        });
+        setIsNew(true);
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
 
   /* ─── Auto hide notification ───────────────── */
   useEffect(() => {

@@ -25,6 +25,7 @@ const EMPTY_FORM = {
   contact_person: "",
   email: "",
   phone: "",
+  gstin: "",
   lead_time: "",
   address: "",
   city: "",
@@ -39,6 +40,17 @@ const Field = ({ label, icon: Icon, required, children }) => (
       {label}
       {required && <span className="text-destructive ml-0.5">*</span>}
     </Label>
+    {children}
+  </div>
+);
+
+/* ── Section wrapper — must be at module level so React never remounts inputs ── */
+const Section = ({ icon: Icon, title, children }) => (
+  <div className="bg-background rounded-lg border shadow-sm p-5 space-y-4">
+    <div className="flex items-center gap-2 pb-3 border-b">
+      <Icon className="w-4 h-4 text-muted-foreground" />
+      <h2 className="text-sm font-semibold">{title}</h2>
+    </div>
     {children}
   </div>
 );
@@ -65,6 +77,7 @@ export default function VendorFormPage() {
           contact_person: vendor.contact_person ?? "",
           email:          vendor.email          ?? "",
           phone:          vendor.phone          ?? "",
+          gstin:          vendor.gstin          ?? "",
           lead_time:      vendor.lead_time      ?? "",
           address:        vendor.address        ?? "",
           city:           vendor.city           ?? "",
@@ -85,6 +98,8 @@ export default function VendorFormPage() {
 
   const isFormValid =
     formData.vendor_name.trim() &&
+    formData.email.trim() &&
+    formData.gstin.trim() &&
     formData.phone.trim() &&
     formData.lead_time !== "";
 
@@ -123,16 +138,6 @@ export default function VendorFormPage() {
     }
   };
 
-  /* ── Section wrapper matching VendorsPage card style ── */
-  const Section = ({ icon: Icon, title, children }) => (
-    <div className="bg-background rounded-lg border shadow-sm p-5 space-y-4">
-      <div className="flex items-center gap-2 pb-3 border-b">
-        <Icon className="w-4 h-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold">{title}</h2>
-      </div>
-      {children}
-    </div>
-  );
 
   if (isLoadingVendor) {
     return (
@@ -252,13 +257,14 @@ export default function VendorFormPage() {
                       className="h-9"
                     />
                   </Field>
-                  <Field label="Email Address" icon={Mail}>
+                  <Field label="Email Address" icon={Mail} required>
                     <Input
                       type="email"
                       value={formData.email}
                       onChange={setField("email")}
                       placeholder="Official email address"
                       className="h-9"
+                      required
                     />
                   </Field>
                   <Field label="Phone Number" icon={Phone} required>
@@ -267,6 +273,15 @@ export default function VendorFormPage() {
                       onChange={setField("phone")}
                       placeholder="Phone number"
                       className="h-9"
+                      required
+                    />
+                  </Field>
+                  <Field label="GSTIN" icon={Building2} required>
+                    <Input
+                      value={formData.gstin}
+                      onChange={setField("gstin")}
+                      placeholder="e.g., 22AAAAA0000A1Z5"
+                      className="h-9 font-mono uppercase"
                       required
                     />
                   </Field>
@@ -341,7 +356,7 @@ export default function VendorFormPage() {
                 { label: "Vendor Name",    value: formData.vendor_name },
                 { label: "Contact",        value: formData.contact_person },
                 { label: "Email",          value: formData.email },
-                { label: "Phone",          value: formData.phone },
+                { label: "GSTIN",          value: formData.gstin },
                 { label: "Lead Time",      value: formData.lead_time ? `${formData.lead_time} days` : "" },
                 { label: "Location",       value: [formData.city, formData.state, formData.country].filter(Boolean).join(", ") },
               ].map(({ label, value }) => (

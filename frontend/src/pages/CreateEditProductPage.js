@@ -40,6 +40,8 @@ import {
   createProduct,
   updateProduct,
   getProduct,
+  listCategories,
+  createCategory,
   listSuppliers,
   listVendors,
 } from "../services/apiService";
@@ -55,12 +57,6 @@ const toArray = (res, key = null) => {
 };
 
 /* ─── constants ─── */
-const DEFAULT_CATEGORIES = [
-  "Electronics", "Clothing", "Food & Beverage", "Hardware",
-  "Furniture", "Office Supplies", "Raw Materials", "Packaging",
-  "Chemicals", "Medical", "Automotive", "Tools",
-];
-
 const ABC_OPTIONS = [
   { value: "A", label: "A – High Value", color: "bg-red-100 text-red-700 border-red-200" },
   { value: "B", label: "B – Medium Value", color: "bg-amber-100 text-amber-700 border-amber-200" },
@@ -247,7 +243,7 @@ export default function CreateEditProductPage() {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [suppliers, setSuppliers] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(isEdit);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -257,9 +253,10 @@ export default function CreateEditProductPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [sRes, vRes] = await Promise.allSettled([listSuppliers(), listVendors()]);
+        const [sRes, vRes, cRes] = await Promise.allSettled([listSuppliers(), listVendors(), listCategories()]);
         setSuppliers(sRes.status === "fulfilled" ? toArray(sRes.value, "suppliers") : []);
         setVendors(vRes.status === "fulfilled" ? toArray(vRes.value, "vendors") : []);
+        setCategories(cRes.status === "fulfilled" ? toArray(cRes.value).map((cat) => cat.name) : []);
       } catch (e) {
         console.error(e);
       }
@@ -308,8 +305,16 @@ export default function CreateEditProductPage() {
     }
   };
 
-  const handleAddCategory = (cat) => {
-    setCategories((prev) => (prev.includes(cat) ? prev : [...prev, cat]));
+  const handleAddCategory = async (cat) => {
+    const normalized = cat.trim().toLowerCase();
+    if (!normalized) return;
+    try {
+      await createCategory({ name: normalized });
+    } catch (error) {
+      console.error("Failed to persist category:", error);
+    } finally {
+      setCategories((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
+    }
   };
 
   const handleSubmit = async (e) => {

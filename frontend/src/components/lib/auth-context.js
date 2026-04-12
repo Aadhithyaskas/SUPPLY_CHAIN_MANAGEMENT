@@ -9,37 +9,62 @@ import {
 
 const AuthContext = createContext(undefined);
 
+const normalizeRole = (role) =>
+  role === "FOUNDER_ADMIN" ? "admin" : role;
+
 export function AuthProvider({ children }) {
   const [user, setUserState] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  // 🔁 Restore session on refresh
+  // ─── Restore session from JWT in sessionStorage ───────────────────────────
   useEffect(() => {
-    const storedUser = sessionStorage.getItem("user");
-    const storedToken = sessionStorage.getItem("authToken");
+    const storedUser  = sessionStorage.getItem("user");
+    const accessToken = sessionStorage.getItem("accessToken");
 
-    if (storedUser && storedToken) {
+    if (storedUser && accessToken) {
       setUserState(JSON.parse(storedUser));
     }
 
     setIsLoading(false);
   }, []);
 
-  // 🔐 LOGIN (Step 1 → OTP)
+  // ─── Step 1: Login with credentials ──────────────────────────────────────
+  // Backend: POST /auth/login/
+  // • Founder Admin (admin role)  → returns access+refresh tokens immediately
+  // • Regular employees           → sends OTP email, returns "OTP sent"
   const handleLogin = async (employeeId, email, password, adminId) => {
     try {
       const response = await login(employeeId, email, password, adminId);
 
-      sessionStorage.setItem(
-        "tempLoginData",
-        JSON.stringify({
-          employeeId,
-          email,
-          adminId,
-          role: response.role,
-        })
-      );
+      // Founder Admin bypasses OTP — JWT returned right away
+      if (response.access) {
+        const userData = {
+          id:          response.employee_id || response.admin_id,
+          name:        response.name
+                         || response.username
+                         || (employeeId ? `Employee ${employeeId}` : `Admin ${adminId}`),
+          email:       email || response.email,
+          role:        normalizeRole(response.role) || "admin",
+          isFirstLogin: false,
+        };
+
+        sessionStorage.setItem("accessToken",  response.access);
+        sessionStorage.setItem("refreshToken", response.refresh);
+        sessionStorage.setItem("user", JSON.stringify(userData));
+
+        setUserState(userData);
+        navigate("/dashboard");
+        return { success: true, skipOTP: true };
+      }
+
+      // Non-admin — save temp data, caller shows OTP form
+      sessionStorage.setItem("tempLoginData", JSON.stringify({
+        employeeId,
+        email:  response.email || email,
+        adminId,
+        role:   response.role,
+      }));
 
       return { success: true, data: response };
     } catch (error) {
@@ -47,36 +72,40 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // 🔑 VERIFY OTP (Step 2 → Dashboard)
+  // ─── Step 2: Verify OTP → receive JWT ────────────────────────────────────
+  // Backend: POST /auth/verify-login-otp/
+  // Returns: { access, refresh, role, employee_id/admin_id,
+  //            force_change_password, email, message }
   const handleVerifyOTP = async (otp) => {
     try {
       const response = await verifyOTP(otp);
 
-      // ✅ FIX: Extract real name from response fields
-      // Backend may return: full_name, name, first_name+last_name, username, or employee_id
       const resolveName = (res) => {
-        if (res.full_name) return res.full_name;
-        if (res.name) return res.name;
+        if (res.full_name)   return res.full_name;
+        if (res.name)        return res.name;
         if (res.first_name || res.last_name)
           return `${res.first_name || ""} ${res.last_name || ""}`.trim();
-        if (res.username) return res.username;
+        if (res.username)    return res.username;
         if (res.employee_id) return `Employee ${res.employee_id}`;
-        if (res.admin_id) return `Admin ${res.admin_id}`;
+        if (res.admin_id)    return `Admin ${res.admin_id}`;
         return "User";
       };
 
       const userData = {
-        id: response.employee_id || response.admin_id,
-        name: resolveName(response),           // ✅ real name now
-        email: response.email,
-        role: response.role,
+        id:          response.employee_id || response.admin_id,
+        name:        resolveName(response),
+        email:       response.email,
+        role:        normalizeRole(response.role),
         isFirstLogin: response.force_change_password || false,
       };
 
-      setUserState(userData);
+      // Persist JWT tokens — used by apiRequest via Authorization header
+      sessionStorage.setItem("accessToken",  response.access);
+      sessionStorage.setItem("refreshToken", response.refresh);
       sessionStorage.setItem("user", JSON.stringify(userData));
-      sessionStorage.setItem("authToken", "authenticated");
       sessionStorage.removeItem("tempLoginData");
+
+      setUserState(userData);
 
       if (response.force_change_password) {
         navigate("/auth/force-change-password");
@@ -85,8 +114,8 @@ export function AuthProvider({ children }) {
       }
 
       return {
-        success: true,
-        user: userData,
+        success:            true,
+        user:               userData,
         forceChangePassword: response.force_change_password,
       };
     } catch (error) {
@@ -94,7 +123,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // 🔄 Force password change
+  // ─── Force password change after first login ──────────────────────────────
   const handleForceChangePassword = async (newPassword, confirmPassword) => {
     try {
       await forceChangePassword(newPassword, confirmPassword);
@@ -104,25 +133,27 @@ export function AuthProvider({ children }) {
       sessionStorage.setItem("user", JSON.stringify(updatedUser));
 
       navigate("/dashboard");
-
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
-  // 🚪 Logout
+  // ─── Logout: blacklist refresh token, clear state ────────────────────────
   const handleLogout = async () => {
     try {
-      await apiLogout();
+      const refreshToken = sessionStorage.getItem("refreshToken");
+      if (refreshToken) {
+        await apiLogout({ refresh_token: refreshToken });
+      }
     } catch (error) {
       console.error("Logout API error:", error);
     } finally {
       setUserState(null);
       sessionStorage.removeItem("user");
-      sessionStorage.removeItem("authToken");
+      sessionStorage.removeItem("accessToken");
+      sessionStorage.removeItem("refreshToken");
       sessionStorage.removeItem("tempLoginData");
-
       navigate("/auth/login");
     }
   };
@@ -138,10 +169,10 @@ export function AuthProvider({ children }) {
         user,
         isAuthenticated: !!user,
         isLoading,
-        login: handleLogin,
-        verifyOTP: handleVerifyOTP,
+        login:               handleLogin,
+        verifyOTP:           handleVerifyOTP,
         forceChangePassword: handleForceChangePassword,
-        logout: handleLogout,
+        logout:              handleLogout,
         setUser,
       }}
     >

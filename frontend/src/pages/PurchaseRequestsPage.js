@@ -2,9 +2,15 @@ import { useState, useEffect } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, Check, X, Loader2, Eye, Building2, Package, Calendar, User, Mail, Phone, MapPin, Clock, Tag, FileText } from "lucide-react";
+import {
+  Plus, Search, Check, X, Loader2, Eye, Building2, Package,
+  User, Mail, Phone, MapPin, Clock, Tag, FileText, AlertTriangle,
+  ChevronDown, RefreshCw,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +20,9 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "../components/ui/select";
 import { useAuth } from "../components/lib/auth-context";
 import {
   listPurchaseRequests,
@@ -25,9 +33,11 @@ import {
   listVendors,
   getVendor,
   getProduct,
+  updatePurchaseRequest, // you may need to add this to apiService if not present
 } from "../services/apiService";
 import { useToast } from "../components/ui/use-toast";
-// Normalise any API response to a plain array
+
+// ─── helpers ──────────────────────────────────────────────────────────────
 const toArray = (res, knownKey = null) => {
   if (!res) return [];
   if (Array.isArray(res)) return res;
@@ -38,45 +48,258 @@ const toArray = (res, knownKey = null) => {
   return Object.values(res).find(Array.isArray) || [];
 };
 
-// Safe search: coerces any value type to string before matching
 const matchesSearch = (value, query) =>
   String(value ?? "").toLowerCase().includes(query);
 
 const STATUS_MAP = {
-  Pending:           { label: "Pending",          variant: "outline" },
-  "Manager Approved":{ label: "Manager Approved", variant: "default" },
-  "Finance Pending": { label: "Finance Review",   variant: "warning" },
-  Approved:          { label: "Approved",         variant: "secondary" },
-  Rejected:          { label: "Rejected",         variant: "destructive" },
+  Pending:             { label: "Pending",          variant: "outline" },
+  "Manager Approved":  { label: "Manager Approved", variant: "default" },
+  "Finance Pending":   { label: "Finance Review",   variant: "warning" },
+  Approved:            { label: "Approved",         variant: "secondary" },
+  Rejected:            { label: "Rejected",         variant: "destructive" },
 };
 
-const EMPTY_PR = {
-  product_id: "",
-  vendor_id: "",
-  requested_quantity: "",
-};
+const EMPTY_PR = { product_id: "", vendor_id: "", requested_cartons: "" };
 
+// ─── Approve Edit Drawer ───────────────────────────────────────────────────
+// Shown when a manager clicks Approve on a PR.
+// Lets them change vendor and carton qty before committing.
+// For auto-generated PRs (is_auto_generated=true) this is especially important
+// since the system-chosen vendor and qty may need manual adjustment.
+function ApproveEditDrawer({ pr, vendors, products, open, onClose, onConfirm, isSubmitting }) {
+  const [selectedVendor, setSelectedVendor]   = useState(pr?.vendor || pr?.vendor_id || "");
+  const [cartons, setCartons]                 = useState(String(pr?.requested_cartons || ""));
+  const [notes, setNotes]                     = useState("");
+
+  // Reset when PR changes
+  useEffect(() => {
+    if (pr) {
+      setSelectedVendor(pr.vendor || pr.vendor_id || "");
+      setCartons(String(pr.requested_cartons || ""));
+      setNotes("");
+    }
+  }, [pr?.pr_id]);
+
+  if (!pr) return null;
+
+  const product = products.find(
+    p => String(p.product_id) === String(pr.product || pr.product_id)
+  );
+  const chosenVendor = vendors.find(v => String(v.vendor_id) === String(selectedVendor));
+
+  const estimatedTotal = cartons && product
+    ? parseInt(cartons) * (product.carton_price ?? product.unit_price ?? 0)
+    : pr.total_amount ?? 0;
+
+  const needsFinance = estimatedTotal > 5000;
+  const vendorChanged = String(selectedVendor) !== String(pr.vendor || pr.vendor_id || "");
+  const cartonsChanged = parseInt(cartons) !== pr.requested_cartons;
+  const hasChanges = vendorChanged || cartonsChanged;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[560px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-600" />
+            Review &amp; Approve Purchase Request
+          </DialogTitle>
+          <DialogDescription>
+            PR #{pr.pr_id}
+            {pr.is_auto_generated && (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-semibold">
+                Auto-generated
+              </span>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 py-2">
+          {/* Product info — read-only */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Product</p>
+            <p className="text-sm font-semibold text-gray-900">
+              {pr.product_name || product?.product_name || "—"}
+            </p>
+            {product && (
+              <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                <span>Category: <strong className="text-gray-700">{product.category}</strong></span>
+                <span>Unit: <strong className="text-gray-700">₹{(product.unit_price ?? 0).toLocaleString()}</strong></span>
+                <span>Carton price: <strong className="text-gray-700">₹{(product.carton_price ?? 0).toLocaleString()}</strong></span>
+              </div>
+            )}
+          </div>
+
+          {/* Original system recommendation (shown for auto-PRs) */}
+          {pr.is_auto_generated && (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+              <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> System Recommendation
+              </p>
+              <div className="flex gap-6 text-xs text-blue-700">
+                <span>Vendor: <strong>{pr.vendor_name || "—"}</strong></span>
+                <span>Score: <strong>{pr.recommended_score ? (pr.recommended_score * 100).toFixed(0) + "%" : "—"}</strong></span>
+                <span>Cartons: <strong>{pr.requested_cartons}</strong></span>
+                <span>Amount: <strong>₹{(pr.total_amount ?? 0).toLocaleString()}</strong></span>
+              </div>
+              <p className="text-[10px] text-blue-500 mt-1.5">
+                You can change the vendor and quantity below before approving.
+              </p>
+            </div>
+          )}
+
+          {/* Editable vendor */}
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-semibold text-gray-600">
+              Vendor
+              {vendorChanged && (
+                <span className="ml-2 text-[10px] text-amber-600 font-normal">Changed</span>
+              )}
+            </Label>
+            <Select value={String(selectedVendor)} onValueChange={setSelectedVendor}>
+              <SelectTrigger className="h-9 text-sm border-gray-300">
+                <SelectValue placeholder="Select vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                {vendors.map(v => (
+                  <SelectItem key={v.vendor_id} value={String(v.vendor_id)}>
+                    <span className="flex items-center gap-2">
+                      {v.vendor_name}
+                      {String(v.vendor_id) === String(pr.vendor || pr.vendor_id) && (
+                        <span className="text-[10px] text-gray-400">(system pick)</span>
+                      )}
+                      {v.lead_time && (
+                        <span className="text-[10px] text-gray-400">· {v.lead_time}d lead</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {chosenVendor && (
+              <p className="text-[10px] text-gray-500">
+                Contact: {chosenVendor.contact_person || "—"} · {chosenVendor.email || chosenVendor.phone || "—"}
+              </p>
+            )}
+          </div>
+
+          {/* Editable carton qty */}
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-semibold text-gray-600">
+              Cartons to order
+              {cartonsChanged && (
+                <span className="ml-2 text-[10px] text-amber-600 font-normal">
+                  Changed from {pr.requested_cartons}
+                </span>
+              )}
+            </Label>
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                min="1"
+                value={cartons}
+                onChange={e => setCartons(e.target.value)}
+                className="h-9 w-32 text-sm border-gray-300 text-center tabular-nums"
+              />
+              {product && cartons && (
+                <p className="text-xs text-gray-500">
+                  = <strong className="text-gray-800">
+                    {(parseInt(cartons) * (product.conversion_factor || 1)).toLocaleString()}
+                  </strong> {product.base_unit || "units"}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-semibold text-gray-600">Approval notes (optional)</Label>
+            <Input
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Reason for vendor/qty change, special instructions..."
+              className="h-9 text-sm border-gray-300"
+            />
+          </div>
+
+          {/* Cost summary */}
+          <div className={`rounded-lg px-4 py-3 border ${needsFinance ? "border-amber-200 bg-amber-50" : "border-gray-200 bg-gray-50"}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Estimated Total</p>
+                <p className="text-2xl font-bold tabular-nums text-gray-900 mt-0.5">
+                  ₹{estimatedTotal.toLocaleString()}
+                </p>
+              </div>
+              {needsFinance && (
+                <div className="text-right">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-semibold">
+                    <AlertTriangle className="w-3 h-3" /> Finance approval required
+                  </span>
+                  <p className="text-[10px] text-amber-600 mt-1">Amount exceeds ₹5,000</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => onConfirm({ vendor_id: selectedVendor, requested_cartons: parseInt(cartons), notes })}
+            disabled={isSubmitting || !selectedVendor || !cartons || parseInt(cartons) < 1}
+            className="bg-emerald-600 hover:bg-emerald-700 font-semibold"
+          >
+            {isSubmitting
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Approving...</>
+              : hasChanges
+              ? "Save Changes & Approve"
+              : "Approve"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main page ─────────────────────────────────────────────────────────────
 export default function PurchaseRequestsPage() {
-  const { user } = useAuth();
+  const { user }  = useAuth();
   const { toast } = useToast();
-  const [search, setSearch] = useState("");
-  const [prs, setPrs] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedPR, setSelectedPR] = useState(null);
-  const [actionType, setActionType] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [vendors, setVendors] = useState([]);
-  const [newPR, setNewPR] = useState(EMPTY_PR);
-  
-  // Detailed view states
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [detailPR, setDetailPR] = useState(null);
+
+  const [search, setSearch]           = useState("");
+  const [prs, setPrs]                 = useState([]);
+  const [isLoading, setIsLoading]     = useState(true);
+  const [products, setProducts]       = useState([]);
+  const [vendors, setVendors]         = useState([]);
+
+  // Approve edit drawer
+  const [approveDrawerPR, setApproveDrawerPR]   = useState(null);
+  const [isApproving, setIsApproving]           = useState(false);
+
+  // Reject confirmation
+  const [rejectPR, setRejectPR]       = useState(null);
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  // Finance action
+  const [financeDialogPR, setFinanceDialogPR]   = useState(null);
+  const [financeAction, setFinanceAction]       = useState(null); // "approve" | "reject"
+  const [isFinanceActing, setIsFinanceActing]   = useState(false);
+
+  // Detail view
+  const [detailPR, setDetailPR]         = useState(null);
   const [detailVendor, setDetailVendor] = useState(null);
   const [detailProduct, setDetailProduct] = useState(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailOpen, setDetailOpen]     = useState(false);
+
+  // Create PR dialog
+  const [createOpen, setCreateOpen]   = useState(false);
+  const [newPR, setNewPR]             = useState(EMPTY_PR);
+  const [isCreating, setIsCreating]   = useState(false);
 
   const isManager = ["manager", "admin"].includes(user?.role);
   const isFinance  = ["finance_director", "admin"].includes(user?.role);
@@ -92,146 +315,173 @@ export default function PurchaseRequestsPage() {
     try {
       const data = await listPurchaseRequests();
       setPrs(toArray(data));
-    } catch (error) {
-      console.error("Failed to load purchase requests:", error);
+    } catch (err) {
       toast({ title: "Error", description: "Failed to load purchase requests.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   };
 
   const loadProducts = async () => {
-    try {
-      const data = await listProducts();
-      setProducts(toArray(data, "products"));
-    } catch (error) {
-      console.error("Failed to load products:", error);
-    }
+    try { const data = await listProducts(); setProducts(toArray(data, "products")); }
+    catch { /* silent */ }
   };
 
   const loadVendors = async () => {
-    try {
-      const data = await listVendors();
-      setVendors(toArray(data, "vendors"));
-    } catch (error) {
-      console.error("Failed to load vendors:", error);
-    }
+    try { const data = await listVendors(); setVendors(toArray(data, "vendors")); }
+    catch { /* silent */ }
   };
 
+  // ── Detail view ──────────────────────────────────────────────────────────
   const handleViewDetails = async (pr) => {
     setIsLoadingDetail(true);
-    setDetailDialogOpen(true);
+    setDetailOpen(true);
     setDetailPR(pr);
-    
+    setDetailVendor(null);
+    setDetailProduct(null);
     try {
-      // Fetch vendor details if vendor_id exists
-      if (pr.vendor_id) {
-        const vendorData = await getVendor(pr.vendor_id);
-        setDetailVendor(vendorData);
-      } else {
-        setDetailVendor(null);
-      }
-      
-      // Fetch product details if product_id exists
-      if (pr.product_id) {
-        const productData = await getProduct(pr.product_id);
-        setDetailProduct(productData);
-      } else {
-        setDetailProduct(null);
-      }
-    } catch (error) {
-      console.error("Failed to load details:", error);
-      toast({ title: "Error", description: "Failed to load detailed information.", variant: "destructive" });
-    } finally {
-      setIsLoadingDetail(false);
-    }
+      const [vRes, pRes] = await Promise.allSettled([
+        pr.vendor   ? getVendor(pr.vendor)   : Promise.reject(),
+        pr.product  ? getProduct(pr.product) : Promise.reject(),
+      ]);
+      if (vRes.status === "fulfilled") setDetailVendor(vRes.value);
+      if (pRes.status === "fulfilled") setDetailProduct(pRes.value);
+    } catch { /* silent */ }
+    finally { setIsLoadingDetail(false); }
   };
 
-  const handleApprove = (pr) => { setSelectedPR(pr); setActionType("approve"); setDialogOpen(true); };
-  const handleReject  = (pr) => { setSelectedPR(pr); setActionType("reject");  setDialogOpen(true); };
+  // ── Manager approve flow ─────────────────────────────────────────────────
+  // Opens the edit drawer instead of a simple confirm dialog.
+  const handleApproveClick = (pr) => setApproveDrawerPR(pr);
 
-  const handleConfirmAction = async () => {
-    setIsSubmitting(true);
+  const handleApproveConfirm = async ({ vendor_id, requested_cartons, notes }) => {
+    if (!approveDrawerPR) return;
+    setIsApproving(true);
     try {
-      if (actionType === "approve") {
-        if (selectedPR.status === "Finance Pending" && isFinance) {
-          await financeApprovePR(selectedPR.pr_id);
-          toast({ title: "Success", description: "PR approved by Finance. PO created." });
-        } else if (isManager) {
-          await managerApprovePR(selectedPR.pr_id);
-          const msg = selectedPR.total_amount > 5000 && !isFinance
-            ? "PR approved. Awaiting Finance Director approval."
-            : "PR approved and PO created.";
-          toast({ title: "Success", description: msg });
-        } else {
-          toast({ title: "Error", description: "You don't have permission to approve this PR.", variant: "destructive" });
-          setDialogOpen(false);
-          return;
-        }
-        loadPRs();
-      } else {
-        toast({ title: "Info", description: "Reject functionality coming soon." });
+      const pr = approveDrawerPR;
+
+      // If manager changed vendor or qty, update the PR first before approving
+      const vendorChanged   = String(vendor_id) !== String(pr.vendor || pr.vendor_id || "");
+      const cartonsChanged  = requested_cartons !== pr.requested_cartons;
+
+      if ((vendorChanged || cartonsChanged) && typeof updatePurchaseRequest === "function") {
+        // updatePurchaseRequest should PATCH /api/purchase-requests/<pr_id>/
+        // with { vendor_id, requested_cartons, notes }
+        // Add this endpoint + apiService function if not yet present.
+        await updatePurchaseRequest(pr.pr_id, {
+          vendor_id,
+          requested_cartons,
+          ...(notes ? { manager_notes: notes } : {}),
+        });
       }
-      setDialogOpen(false);
-    } catch (error) {
-      console.error("Action failed:", error);
-      toast({ title: "Error", description: error.message || "Action failed.", variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
+
+      await managerApprovePR(pr.pr_id);
+
+      const product = products.find(p => String(p.product_id) === String(pr.product || pr.product_id));
+      const total = requested_cartons * (product?.carton_price ?? product?.unit_price ?? 0);
+      const needsFinance = total > 5000;
+
+      toast({
+        title: "PR Approved",
+        description: needsFinance && !isFinance
+          ? "Sent to Finance Director for final approval (amount > ₹5,000)."
+          : "Purchase Order created and emailed to vendor.",
+      });
+
+      setApproveDrawerPR(null);
+      loadPRs();
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Approval failed.", variant: "destructive" });
+    } finally { setIsApproving(false); }
   };
 
+  // ── Manager reject ───────────────────────────────────────────────────────
+  const handleRejectConfirm = async () => {
+    if (!rejectPR) return;
+    setIsRejecting(true);
+    try {
+      // Most backends handle rejection at finance stage — if your backend supports
+      // manager rejection at Pending stage too, call the right endpoint here.
+      if (rejectPR.status === "Finance Pending" && isFinance) {
+        await financeApprovePR(rejectPR.pr_id, { action: "reject" });
+      } else {
+        // For manager-stage rejection, send action:"reject" or call a dedicated endpoint
+        await managerApprovePR(rejectPR.pr_id, { action: "reject" });
+      }
+      toast({ title: "PR Rejected", description: `PR #${rejectPR.pr_id} has been rejected.` });
+      setRejectPR(null);
+      loadPRs();
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Rejection failed.", variant: "destructive" });
+    } finally { setIsRejecting(false); }
+  };
+
+  // ── Finance action ───────────────────────────────────────────────────────
+  const handleFinanceAction = async () => {
+    if (!financeDialogPR || !financeAction) return;
+    setIsFinanceActing(true);
+    try {
+      await financeApprovePR(financeDialogPR.pr_id, { action: financeAction });
+      toast({
+        title: financeAction === "approve" ? "PR Approved" : "PR Rejected",
+        description: financeAction === "approve"
+          ? "Purchase Order created and emailed to vendor."
+          : `PR #${financeDialogPR.pr_id} rejected by Finance.`,
+      });
+      setFinanceDialogPR(null);
+      setFinanceAction(null);
+      loadPRs();
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Action failed.", variant: "destructive" });
+    } finally { setIsFinanceActing(false); }
+  };
+
+  // ── Create PR ────────────────────────────────────────────────────────────
   const handleCreatePR = async (e) => {
     e.preventDefault();
-    if (!newPR.product_id || !newPR.vendor_id || !newPR.requested_quantity) {
+    if (!newPR.product_id || !newPR.vendor_id || !newPR.requested_cartons) {
       toast({ title: "Error", description: "Please fill in all fields.", variant: "destructive" });
       return;
     }
-
-    setIsSubmitting(true);
+    setIsCreating(true);
     try {
-      const product = products.find((p) => String(p.product_id) === String(newPR.product_id));
-      const payload = {
-        product_id:         newPR.product_id,
-        vendor_id:          newPR.vendor_id,
-        requested_quantity: parseInt(newPR.requested_quantity),
-        ...(product ? { total_amount: parseInt(newPR.requested_quantity) * (product.unit_price ?? 0) } : {}),
-      };
-
-      await createPurchaseRequest(payload);
-      toast({ title: "Success", description: "Purchase request created successfully." });
-      setCreateDialogOpen(false);
+      const product = products.find(p => String(p.product_id) === String(newPR.product_id));
+      const cartons = parseInt(newPR.requested_cartons, 10);
+      await createPurchaseRequest({
+        product_id:       newPR.product_id,
+        vendor_id:        newPR.vendor_id,
+        requested_cartons: cartons,
+        ...(product ? { total_amount: cartons * (product.carton_price ?? product.unit_price ?? 0) } : {}),
+      });
+      toast({ title: "Success", description: "Purchase request created." });
+      setCreateOpen(false);
       setNewPR(EMPTY_PR);
       loadPRs();
-    } catch (error) {
-      console.error("Failed to create PR:", error);
-      toast({ title: "Error", description: error.message || "Failed to create purchase request.", variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err) {
+      toast({ title: "Error", description: err.message || "Failed to create PR.", variant: "destructive" });
+    } finally { setIsCreating(false); }
   };
 
-  const canApprove = (pr) => {
-    if (pr.status === "Pending" && isManager) return true;
-    if (pr.status === "Finance Pending" && isFinance) return true;
-    return false;
-  };
+  // ── Permission helpers ───────────────────────────────────────────────────
+  const canManagerApprove = (pr) => pr.status === "Pending" && isManager;
+  const canManagerReject  = (pr) => pr.status === "Pending" && isManager;
+  const canFinanceAct     = (pr) => pr.status === "Finance Pending" && isFinance;
 
   const q = search.toLowerCase();
-  const filteredPRs = prs.filter(
-    (pr) =>
-      matchesSearch(pr.pr_id, q) ||
-      matchesSearch(pr.product?.product_name, q) ||
-      matchesSearch(pr.vendor?.vendor_name, q)
+  const filteredPRs = prs.filter(pr =>
+    matchesSearch(pr.pr_id, q) ||
+    matchesSearch(pr.product_name, q) ||
+    matchesSearch(pr.vendor_name, q)
   );
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Purchase Requests</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage and approve purchase requests</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage and approve purchase requests. Managers can adjust vendor and quantity before approving.
+        </p>
       </div>
 
+      {/* toolbar */}
       <div className="flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -239,14 +489,29 @@ export default function PurchaseRequestsPage() {
             placeholder="Search PRs..."
             className="pl-9 h-9 border-gray-200"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <Button size="sm" className="h-9 bg-[#1E3A8A] hover:bg-[#1E293B]" onClick={() => { setNewPR(EMPTY_PR); setCreateDialogOpen(true); }}>
-          <Plus className="w-4 h-4 mr-1.5" /> Create PR
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadPRs}
+            disabled={isLoading}
+            className="p-1.5 rounded border border-gray-200 hover:bg-gray-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
+          <Button
+            size="sm"
+            className="h-9 bg-[#1E3A8A] hover:bg-[#1E293B]"
+            onClick={() => { setNewPR(EMPTY_PR); setCreateOpen(true); }}
+          >
+            <Plus className="w-4 h-4 mr-1.5" /> Create PR
+          </Button>
+        </div>
       </div>
 
+      {/* ── PR table ──────────────────────────────────────────────────────── */}
       <Card className="shadow-sm border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
@@ -254,7 +519,7 @@ export default function PurchaseRequestsPage() {
               <TableRow className="bg-gray-50">
                 <TableHead className="text-xs font-semibold text-gray-600">PR ID</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600">Product</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 text-right">Qty</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 text-right">Cartons</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 text-right">Amount</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600">Vendor</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600">Date</TableHead>
@@ -276,17 +541,24 @@ export default function PurchaseRequestsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPRs.map((pr) => (
+                filteredPRs.map(pr => (
                   <TableRow key={pr.pr_id} className="hover:bg-gray-50">
-                    <TableCell className="text-xs font-mono font-medium text-gray-900">{pr.pr_id}</TableCell>
-                    <TableCell className="text-sm text-gray-700">{pr.product|| "-"}</TableCell>
-                    <TableCell className="text-sm text-right text-gray-700">
-                      {(pr.requested_quantity ?? 0).toLocaleString()}
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono font-medium text-gray-900">{pr.pr_id}</span>
+                        {pr.is_auto_generated && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[9px] font-semibold" title="Auto-generated by reorder system">AUTO</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-700">{pr.product_name || "-"}</TableCell>
+                    <TableCell className="text-sm text-right tabular-nums text-gray-700">
+                      {pr.requested_cartons ?? "—"}
                     </TableCell>
                     <TableCell className="text-sm text-right font-medium text-gray-900">
                       ₹{(pr.total_amount ?? 0).toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-xs text-gray-600">{pr.vendor || "-"}</TableCell>
+                    <TableCell className="text-xs text-gray-600">{pr.vendor_name || "-"}</TableCell>
                     <TableCell className="text-xs text-gray-500">
                       {pr.created_at ? new Date(pr.created_at).toLocaleDateString() : "-"}
                     </TableCell>
@@ -300,22 +572,53 @@ export default function PurchaseRequestsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button 
+                        {/* View details */}
+                        <button
                           onClick={() => handleViewDetails(pr)}
-                          className="p-1.5 rounded hover:bg-gray-100 transition-colors" 
+                          className="p-1.5 rounded hover:bg-gray-100 transition-colors"
                           title="View Details"
                         >
                           <Eye className="w-3.5 h-3.5 text-gray-500" />
                         </button>
-                        {canApprove(pr) && (
+
+                        {/* Manager: approve (opens edit drawer) */}
+                        {canManagerApprove(pr) && (
+                          <button
+                            onClick={() => handleApproveClick(pr)}
+                            className="p-1.5 rounded hover:bg-green-50 transition-colors"
+                            title="Review & Approve"
+                          >
+                            <Check className="w-3.5 h-3.5 text-green-600" />
+                          </button>
+                        )}
+
+                        {/* Manager: reject */}
+                        {canManagerReject(pr) && (
+                          <button
+                            onClick={() => setRejectPR(pr)}
+                            className="p-1.5 rounded hover:bg-red-50 transition-colors"
+                            title="Reject"
+                          >
+                            <X className="w-3.5 h-3.5 text-red-500" />
+                          </button>
+                        )}
+
+                        {/* Finance: approve / reject */}
+                        {canFinanceAct(pr) && (
                           <>
-                            <button onClick={() => handleApprove(pr)}
-                              className="p-1.5 rounded hover:bg-green-50 transition-colors" title="Approve">
+                            <button
+                              onClick={() => { setFinanceDialogPR(pr); setFinanceAction("approve"); }}
+                              className="p-1.5 rounded hover:bg-green-50 transition-colors"
+                              title="Finance Approve"
+                            >
                               <Check className="w-3.5 h-3.5 text-green-600" />
                             </button>
-                            <button onClick={() => handleReject(pr)}
-                              className="p-1.5 rounded hover:bg-red-50 transition-colors" title="Reject">
-                              <X className="w-3.5 h-3.5 text-red-600" />
+                            <button
+                              onClick={() => { setFinanceDialogPR(pr); setFinanceAction("reject"); }}
+                              className="p-1.5 rounded hover:bg-red-50 transition-colors"
+                              title="Finance Reject"
+                            >
+                              <X className="w-3.5 h-3.5 text-red-500" />
                             </button>
                           </>
                         )}
@@ -329,15 +632,94 @@ export default function PurchaseRequestsPage() {
         </div>
       </Card>
 
-      {/* Detailed View Dialog */}
-      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      {/* ── Approve Edit Drawer ──────────────────────────────────────────── */}
+      <ApproveEditDrawer
+        pr={approveDrawerPR}
+        vendors={vendors}
+        products={products}
+        open={!!approveDrawerPR}
+        onClose={() => setApproveDrawerPR(null)}
+        onConfirm={handleApproveConfirm}
+        isSubmitting={isApproving}
+      />
+
+      {/* ── Reject confirmation ──────────────────────────────────────────── */}
+      <Dialog open={!!rejectPR} onOpenChange={() => setRejectPR(null)}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900">
-              Purchase Request Details
+            <DialogTitle>Reject Purchase Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reject PR #{rejectPR?.pr_id}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectPR(null)} disabled={isRejecting}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectConfirm}
+              disabled={isRejecting}
+            >
+              {isRejecting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Finance action confirmation ──────────────────────────────────── */}
+      <Dialog open={!!financeDialogPR} onOpenChange={() => { setFinanceDialogPR(null); setFinanceAction(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {financeAction === "approve" ? "Finance Approve" : "Finance Reject"} — PR #{financeDialogPR?.pr_id}
             </DialogTitle>
             <DialogDescription>
-              PR #{detailPR?.pr_id} - Created on {detailPR?.created_at ? new Date(detailPR.created_at).toLocaleString() : "-"}
+              {financeAction === "approve"
+                ? `Approve PR #${financeDialogPR?.pr_id}? A Purchase Order will be created and emailed to the vendor.`
+                : `Reject PR #${financeDialogPR?.pr_id}?`}
+            </DialogDescription>
+          </DialogHeader>
+          {financeAction === "approve" && financeDialogPR && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs space-y-1">
+              <p><span className="text-gray-500">Vendor:</span> <strong>{financeDialogPR.vendor_name}</strong></p>
+              <p><span className="text-gray-500">Amount:</span> <strong>₹{(financeDialogPR.total_amount ?? 0).toLocaleString()}</strong></p>
+              <p><span className="text-gray-500">Cartons:</span> <strong>{financeDialogPR.requested_cartons}</strong></p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setFinanceDialogPR(null); setFinanceAction(null); }}
+              disabled={isFinanceActing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={financeAction === "approve" ? "default" : "destructive"}
+              onClick={handleFinanceAction}
+              disabled={isFinanceActing}
+              className={financeAction === "approve" ? "bg-[#1E3A8A] hover:bg-[#162d6e]" : ""}
+            >
+              {isFinanceActing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {financeAction === "approve" ? "Approve & Create PO" : "Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Detail view ─────────────────────────────────────────────────── */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">Purchase Request Details</DialogTitle>
+            <DialogDescription>
+              PR #{detailPR?.pr_id} — Created on{" "}
+              {detailPR?.created_at ? new Date(detailPR.created_at).toLocaleString() : "—"}
+              {detailPR?.is_auto_generated && (
+                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-semibold">
+                  Auto-generated
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -350,8 +732,7 @@ export default function PurchaseRequestsPage() {
               {/* PR Summary */}
               <div className="bg-gray-50 rounded-lg p-5">
                 <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#1E3A8A]" />
-                  Request Summary
+                  <FileText className="w-4 h-4 text-[#1E3A8A]" /> Request Summary
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
@@ -365,22 +746,38 @@ export default function PurchaseRequestsPage() {
                     <p className="text-lg font-bold text-gray-900">₹{(detailPR?.total_amount ?? 0).toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Requested Quantity</p>
-                    <p className="text-sm font-medium text-gray-900">{detailPR?.requested_quantity} units</p>
+                    <p className="text-xs text-gray-500">Cartons</p>
+                    <p className="text-sm font-medium text-gray-900">{detailPR?.requested_cartons ?? "—"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Requested By</p>
-                    <p className="text-sm text-gray-700">{detailPR?.created_by?.username || "N/A"}</p>
+                    <p className="text-sm text-gray-700">
+                      {detailPR?.is_auto_generated ? "Auto-reorder system" : (detailPR?.created_by_username || "N/A")}
+                    </p>
                   </div>
                 </div>
+                {detailPR?.recommended_score && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-500">
+                      Vendor recommendation score:{" "}
+                      <strong className="text-gray-700">
+                        {(detailPR.recommended_score * 100).toFixed(0)}%
+                      </strong>
+                      {detailPR.manager_notes && (
+                        <span className="ml-4">
+                          Manager notes: <em className="text-gray-700">{detailPR.manager_notes}</em>
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Product Details */}
               {detailProduct && (
                 <div className="border border-gray-200 rounded-lg p-5">
                   <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Package className="w-4 h-4 text-[#1E3A8A]" />
-                    Product Information
+                    <Package className="w-4 h-4 text-[#1E3A8A]" /> Product Information
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-3">
@@ -417,33 +814,28 @@ export default function PurchaseRequestsPage() {
                       <div className="flex items-start gap-2">
                         <Tag className="w-4 h-4 text-gray-400 mt-0.5" />
                         <div>
-                          <p className="text-xs text-gray-500">Size / Dimensions</p>
+                          <p className="text-xs text-gray-500">Size</p>
                           <p className="text-sm text-gray-700">{detailProduct.size || "Not specified"}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <Clock className="w-4 h-4 text-gray-400 mt-0.5" />
                         <div>
-                          <p className="text-xs text-gray-500">Unit Price / Reorder Level</p>
-                          <p className="text-sm text-gray-700">₹{detailProduct.unit_price?.toLocaleString()} / {detailProduct.re_order} units</p>
+                          <p className="text-xs text-gray-500">Carton Price / Reorder Level</p>
+                          <p className="text-sm text-gray-700">
+                            ₹{(detailProduct.carton_price ?? detailProduct.unit_price ?? 0).toLocaleString()} / {detailProduct.re_order} units
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <Tag className="w-4 h-4 text-gray-400 mt-0.5" />
                         <div>
                           <p className="text-xs text-gray-500">Classification</p>
-                          <p className="text-sm text-gray-700">ABC: {detailProduct.ABC} | VED: {detailProduct.VED} | XYZ: {detailProduct.XYZ}</p>
+                          <p className="text-sm text-gray-700">
+                            ABC: {detailProduct.ABC} | VED: {detailProduct.VED} | XYZ: {detailProduct.XYZ}
+                          </p>
                         </div>
                       </div>
-                      {detailProduct.description && (
-                        <div className="flex items-start gap-2">
-                          <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500">Description</p>
-                            <p className="text-sm text-gray-600">{detailProduct.description}</p>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -453,8 +845,7 @@ export default function PurchaseRequestsPage() {
               {detailVendor && (
                 <div className="border border-gray-200 rounded-lg p-5">
                   <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-[#1E3A8A]" />
-                    Vendor Information
+                    <Building2 className="w-4 h-4 text-[#1E3A8A]" /> Vendor Information
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-3">
@@ -509,7 +900,9 @@ export default function PurchaseRequestsPage() {
                       <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
                       <div>
                         <p className="text-xs text-gray-500">Address</p>
-                        <p className="text-sm text-gray-700">{detailVendor.address}, {detailVendor.city}, {detailVendor.state}, {detailVendor.country}</p>
+                        <p className="text-sm text-gray-700">
+                          {detailVendor.address}, {detailVendor.city}, {detailVendor.state}, {detailVendor.country}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -519,35 +912,38 @@ export default function PurchaseRequestsPage() {
               {/* Approval Timeline */}
               <div className="border border-gray-200 rounded-lg p-5">
                 <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#1E3A8A]" />
-                  Approval Timeline
+                  <Clock className="w-4 h-4 text-[#1E3A8A]" /> Approval Timeline
                 </h4>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${
-                      detailPR?.status === "Approved" ? "bg-green-500" : 
-                      detailPR?.status === "Rejected" ? "bg-red-500" : 
-                      detailPR?.status === "Finance Pending" ? "bg-yellow-500" :
-                      detailPR?.status === "Manager Approved" ? "bg-blue-500" : "bg-gray-300"
+                      detailPR?.status === "Approved"       ? "bg-green-500"  :
+                      detailPR?.status === "Rejected"       ? "bg-red-500"    :
+                      detailPR?.status === "Finance Pending"? "bg-yellow-500" :
+                      detailPR?.status === "Manager Approved"? "bg-blue-500"  : "bg-gray-300"
                     }`} />
                     <p className="text-sm text-gray-700">
-                      {detailPR?.status === "Pending" && "Awaiting Manager Approval"}
-                      {detailPR?.status === "Manager Approved" && "Manager Approved - Under Finance Review"}
-                      {detailPR?.status === "Finance Pending" && "Awaiting Finance Director Approval"}
-                      {detailPR?.status === "Approved" && "Approved - Purchase Order Created"}
-                      {detailPR?.status === "Rejected" && "Request Rejected"}
+                      {detailPR?.status === "Pending"           && "Awaiting Manager Approval"}
+                      {detailPR?.status === "Manager Approved"  && "Manager Approved — Under Finance Review"}
+                      {detailPR?.status === "Finance Pending"   && "Awaiting Finance Director Approval"}
+                      {detailPR?.status === "Approved"          && "Approved — Purchase Order Created"}
+                      {detailPR?.status === "Rejected"          && "Request Rejected"}
                     </p>
                   </div>
-                  {detailPR?.total_amount > 5000 && detailPR?.status !== "Approved" && detailPR?.status !== "Rejected" && (
+                  {detailPR?.total_amount > 5000 && !["Approved", "Rejected"].includes(detailPR?.status) && (
                     <div className="flex items-center gap-3 pl-4 border-l-2 border-yellow-400">
                       <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                      <p className="text-sm text-yellow-700">High-value request (₹{(detailPR.total_amount).toLocaleString()}) requires Finance Director approval</p>
+                      <p className="text-sm text-yellow-700">
+                        High-value request (₹{(detailPR.total_amount).toLocaleString()}) requires Finance Director approval
+                      </p>
                     </div>
                   )}
                   {detailPR?.status === "Approved" && (
                     <div className="flex items-center gap-3 pl-4 border-l-2 border-green-400">
                       <div className="w-2 h-2 rounded-full bg-green-500" />
-                      <p className="text-sm text-green-700">Purchase Order has been created and email sent to vendor</p>
+                      <p className="text-sm text-green-700">
+                        Purchase Order has been created and email sent to vendor
+                      </p>
                     </div>
                   )}
                 </div>
@@ -556,66 +952,32 @@ export default function PurchaseRequestsPage() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
-              Close
-            </Button>
+            <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Approval / Rejection Confirmation Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {actionType === "approve" ? "Approve Purchase Request" : "Reject Purchase Request"}
-            </DialogTitle>
-            <DialogDescription>
-              {actionType === "approve"
-                ? selectedPR?.total_amount > 5000 && isManager && !isFinance
-                  ? `This PR requires Finance Director approval. Total: ₹${(selectedPR?.total_amount ?? 0).toLocaleString()}`
-                  : `Are you sure you want to approve PR #${selectedPR?.pr_id}?`
-                : `Are you sure you want to reject PR #${selectedPR?.pr_id}?`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button
-              type="button"
-              variant={actionType === "approve" ? "default" : "destructive"}
-              onClick={handleConfirmAction}
-              disabled={isSubmitting}
-              className={actionType === "approve" ? "bg-[#1E3A8A] hover:bg-[#1E293B]" : ""}
-            >
-              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {actionType === "approve" ? "Approve" : "Reject"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create PR Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+      {/* ── Create PR dialog ─────────────────────────────────────────────── */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <form onSubmit={handleCreatePR}>
             <DialogHeader>
               <DialogTitle>Create Purchase Request</DialogTitle>
               <DialogDescription>
-                Select product, vendor, and quantity to create a purchase request.
+                Select product, vendor, and carton quantity.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label>Product</Label>
-                <Select value={newPR.product_id}
-                  onValueChange={(v) => setNewPR({ ...newPR, product_id: v })}>
+                <Select value={newPR.product_id} onValueChange={v => setNewPR({ ...newPR, product_id: v })}>
                   <SelectTrigger className="border-gray-200">
                     <SelectValue placeholder="Select product" />
                   </SelectTrigger>
                   <SelectContent>
-                    {products.map((p) => (
+                    {products.map(p => (
                       <SelectItem key={p.product_id} value={String(p.product_id)}>
-                        {p.product_name} — ₹{(p.unit_price ?? 0).toLocaleString()}
+                        {p.product_name} — ₹{(p.carton_price ?? p.unit_price ?? 0).toLocaleString()}/ctn
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -623,42 +985,49 @@ export default function PurchaseRequestsPage() {
               </div>
               <div className="grid gap-2">
                 <Label>Vendor</Label>
-                <Select value={newPR.vendor_id}
-                  onValueChange={(v) => setNewPR({ ...newPR, vendor_id: v })}>
+                <Select value={newPR.vendor_id} onValueChange={v => setNewPR({ ...newPR, vendor_id: v })}>
                   <SelectTrigger className="border-gray-200">
                     <SelectValue placeholder="Select vendor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {vendors.map((v) => (
+                    {vendors.map(v => (
                       <SelectItem key={v.vendor_id} value={String(v.vendor_id)}>
-                        {v.vendor_name}
+                        {v.vendor_name}{v.lead_time ? ` · ${v.lead_time}d lead` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Requested Quantity</Label>
-                <Input type="number" min="1" value={newPR.requested_quantity}
-                  onChange={(e) => setNewPR({ ...newPR, requested_quantity: e.target.value })} required 
-                  className="border-gray-200" />
+                <Label>Requested Cartons</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={newPR.requested_cartons}
+                  onChange={e => setNewPR({ ...newPR, requested_cartons: e.target.value })}
+                  required
+                  className="border-gray-200"
+                />
               </div>
-              {newPR.product_id && newPR.requested_quantity && (() => {
-                const p = products.find((p) => String(p.product_id) === String(newPR.product_id));
+              {newPR.product_id && newPR.requested_cartons && (() => {
+                const p = products.find(p => String(p.product_id) === String(newPR.product_id));
                 if (!p) return null;
-                const total = parseInt(newPR.requested_quantity) * (p.unit_price ?? 0);
+                const total = parseInt(newPR.requested_cartons, 10) * (p.carton_price ?? p.unit_price ?? 0);
                 return (
                   <p className="text-xs text-gray-500">
-                    Estimated total: <span className="font-medium text-gray-900">₹{total.toLocaleString()}</span>
-                    {total > 5000 && <span className="ml-2 text-yellow-600">(Requires Finance approval)</span>}
+                    Estimated total:{" "}
+                    <span className="font-medium text-gray-900">₹{total.toLocaleString()}</span>
+                    {total > 5000 && (
+                      <span className="ml-2 text-amber-600">(Requires Finance approval)</span>
+                    )}
                   </p>
                 );
               })()}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-[#1E3A8A] hover:bg-[#1E293B]">
-                {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={isCreating} className="bg-[#1E3A8A] hover:bg-[#1E293B]">
+                {isCreating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Create PR
               </Button>
             </DialogFooter>

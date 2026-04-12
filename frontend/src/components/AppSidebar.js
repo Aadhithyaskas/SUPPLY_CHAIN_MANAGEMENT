@@ -18,7 +18,6 @@ import {
 } from "./ui/sidebar";
 
 export function AppSidebar() {
-  console.log("Sidebar Rendered");
   const { user, logout } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";

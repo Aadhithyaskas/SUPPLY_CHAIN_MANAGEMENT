@@ -4,36 +4,96 @@ import { getCookie } from '../components/utils/helpers';
 /* ================= CSRF ================= */
 
 export const ensureCSRF = async () => {
-  await fetch(`${API_BASE_URL}/auth/csrf/`, {
-    method: 'GET',
-    credentials: 'include',
-  });
+  try {
+    await fetch(`${API_BASE_URL}/auth/csrf/`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+  } catch (error) {
+    console.error('CSRF fetch failed:', error);
+  }
 };
 
 /* ================= BASE API ================= */
 
 export const apiRequest = async (endpoint, method = 'GET', data = null) => {
+  // For GET requests, no CSRF needed
   if (method !== 'GET') {
     await ensureCSRF();
   }
 
   const csrftoken = getCookie('csrftoken');
+  const accessToken = sessionStorage.getItem('accessToken');
+
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  if (csrftoken && method !== 'GET') {
+    headers['X-CSRFToken'] = csrftoken;
+  }
+
+  // Attach JWT token for authentication
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
 
   const options = {
     method,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrftoken || '',
-    },
+    headers,
   };
 
-  if (data) {
+  if (data && method !== 'GET') {
     options.body = JSON.stringify(data);
   }
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+
+    // Handle 401 Unauthorized - Token expired
+    if (response.status === 401) {
+      // Try to refresh token
+      const refreshToken = sessionStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          const refreshResponse = await fetch(`${API_BASE_URL}/token/refresh/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh: refreshToken }),
+          });
+          
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            sessionStorage.setItem('accessToken', refreshData.access);
+            // Retry original request with new token
+            headers['Authorization'] = `Bearer ${refreshData.access}`;
+            const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+              ...options,
+              headers,
+            });
+            const retryData = await retryResponse.json();
+            if (!retryResponse.ok) {
+              throw new Error(retryData.error || retryData.detail || 'Request failed');
+            }
+            return retryData;
+          }
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+        }
+      }
+      
+      // Clear session and redirect to login
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('tempLoginData');
+      if (!window.location.pathname.includes('/auth')) {
+        window.location.href = '/auth/login';
+      }
+      throw new Error('Session expired. Please log in again.');
+    }
+
     const result = await response.json();
 
     if (!response.ok) {
@@ -76,7 +136,7 @@ export const forceChangePassword = (newPassword, confirmPassword) =>
     confirm_password: confirmPassword,
   });
 
-export const logout = () => apiRequest('/auth/logout/', 'POST');
+export const logout = (data = {}) => apiRequest('/auth/logout/', 'POST', data);
 
 /* ================= EMPLOYEE ================= */
 
@@ -118,158 +178,298 @@ export const listInactiveSuppliers = () =>
 /* ================= VENDOR ================= */
 
 export const createVendor = (data) =>
-  apiRequest('/vendors/create/', 'POST', data);
+  apiRequest('/vendors/vendor/create/', 'POST', data);
 
 export const listVendors = () =>
-  apiRequest('/vendors/list_all/', 'GET');
+  apiRequest('/vendors/vendor/list/', 'GET');
 
 export const getVendor = (id) =>
-  apiRequest(`/vendors/${id}/`, 'GET');
+  apiRequest(`/vendors/vendor/${id}/`, 'GET');
 
 export const updateVendor = (id, data) =>
-  apiRequest(`/vendors/update/${id}/`, 'PUT', data);
+  apiRequest(`/vendors/vendor/update/${id}/`, 'PATCH', data);
 
 export const deleteVendor = (id) =>
-  apiRequest(`/vendors/delete/${id}/`, 'DELETE');
+  apiRequest(`/vendors/vendor/delete/${id}/`, 'DELETE');
 
-/* ================= WAREHOUSE ================= */
+/* ── Agreements ── */
+export const uploadVendorAgreement = async (vendorId, formData) => {
+  await ensureCSRF();
+  const csrftoken = getCookie('csrftoken');
+  const accessToken = sessionStorage.getItem('accessToken');
+
+  const headers = {};
+  if (csrftoken) {
+    headers['X-CSRFToken'] = csrftoken;
+  }
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  const res = await fetch(
+    `${API_BASE_URL}/vendors/vendor/${vendorId}/upload-agreement/`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: formData,
+    }
+  );
+  
+  const json = await res.json();
+  if (!res.ok) {
+    const err = new Error(json.error || 'Upload failed');
+    err.reason = json.reason || null;
+    err.details = json;
+    throw err;
+  }
+  return json;
+};
+
+export const listVendorAgreements = (vendorId) =>
+  apiRequest(`/vendors/vendor/${vendorId}/agreements/`, 'GET');
+
+export const createVendorAgreement = (vendorId, data) =>
+  apiRequest(`/vendors/vendor/${vendorId}/agreements/create/`, 'POST', data);
+
+export const getAgreement = (agreementId) =>
+  apiRequest(`/vendors/agreements/${agreementId}/`, 'GET');
+
+export const listAgreementProducts = (agreementId) =>
+  apiRequest(`/vendors/agreements/${agreementId}/products/`, 'GET');
+
+export const addProductToAgreement = (agreementId, data) =>
+  apiRequest(`/vendors/agreements/${agreementId}/products/add/`, 'POST', data);
+
+export const getAgreementProduct = (id) =>
+  apiRequest(`/vendors/agreement-products/${id}/`, 'GET');
+
+export const listAllAgreementProducts = () =>
+  apiRequest('/vendors/agreement-products/', 'GET');
+
+export const listRejectedAgreements = () =>
+  apiRequest('/vendors/rejected-agreements/', 'GET');
 
 export const createWarehouse = (data) =>
-  apiRequest('/vendors/Warehouse/create/', 'POST', data);
+  apiRequest('/vendors/warehouse/create/', 'POST', data);
 
 export const updateWarehouse = (data) =>
-  apiRequest('/vendors/Warehouse/update/', 'PUT', data);
+  apiRequest('/vendors/warehouse/update/', 'PATCH', data);
 
 export const getWarehouse = () =>
   apiRequest('/vendors/warehouse/', 'GET');
+
+/* ================= CATEGORY ================= */
+
+export const listCategories = () =>
+  apiRequest('/vendors/categories/', 'GET');
+
+export const createCategory = (data) =>
+  apiRequest('/vendors/categories/create/', 'POST', data);
+
+export const getCategory = (id) =>
+  apiRequest(`/vendors/categories/${id}/`, 'GET');
 
 /* ================= PRODUCT ================= */
 
 export const createProduct = (data) =>
   apiRequest('/products/create/', 'POST', data);
 
-export const listProducts = () =>
-  apiRequest('/products/listall/', 'GET');
+export const listProducts = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return apiRequest(`/products/listall/${qs ? '?' + qs : ''}`, 'GET');
+};
+
+export const listProductsNeedingZone = () =>
+  apiRequest('/products/needs-zone/', 'GET');
 
 export const getProduct = (id) =>
   apiRequest(`/products/list/${id}/`, 'GET');
 
 export const updateProduct = (id, data) =>
-  apiRequest(`/products/update/${id}/`, 'PUT', data);
+  apiRequest(`/products/update/${id}/`, 'PATCH', data);
+
+export const assignProductZone = (id, data) =>
+  apiRequest(`/products/${id}/assign-zone/`, 'PATCH', data);
 
 export const deleteProduct = (id) =>
   apiRequest(`/products/delete/${id}/`, 'DELETE');
 
+export const barcodeLookup = (barcode) =>
+  apiRequest(`/products/barcode/${barcode}/`, 'GET');
+
+export const listProductVendors = (productId) =>
+  apiRequest(`/vendors/product/${productId}/vendors/`, 'GET');
+
 /* ================= INVENTORY ================= */
 
-export const createInventory = (data) =>
-  apiRequest('/inventory/create/', 'POST', data);
+// Zones
+export const listZones = () => apiRequest('/inventory/zones/', 'GET');
+export const createZone = (data) => apiRequest('/inventory/zones/create/', 'POST', data);
+export const getZone = (id) => apiRequest(`/inventory/zones/${id}/`, 'GET');
+export const updateZone = (id, data) => apiRequest(`/inventory/zones/${id}/update/`, 'PATCH', data);
+export const deleteZone = (id) => apiRequest(`/inventory/zones/${id}/delete/`, 'DELETE');
 
-export const addStock = (productId, quantity) =>
-  apiRequest(`/inventory/add-stock/${productId}/`, 'POST', { quantity });
+// Racks
+export const listRacks = () => apiRequest('/inventory/racks/', 'GET');
+export const createRack = (data) => apiRequest('/inventory/racks/create/', 'POST', data);
+export const getRack = (id) => apiRequest(`/inventory/racks/${id}/`, 'GET');
+export const updateRack = (id, data) => apiRequest(`/inventory/racks/${id}/update/`, 'PATCH', data);
+export const deleteRack = (id) => apiRequest(`/inventory/racks/${id}/delete/`, 'DELETE');
 
-export const removeStock = (productId, quantity) =>
-  apiRequest(`/inventory/remove-stock/${productId}/`, 'POST', { quantity });
+// Shelves & Bins
+export const listShelves = () => apiRequest('/inventory/shelves/', 'GET');
+export const getShelf = (id) => apiRequest(`/inventory/shelves/${id}/`, 'GET');
+export const listBins = () => apiRequest('/inventory/bins/', 'GET');
+export const listAvailableBins = () => apiRequest('/inventory/bins/available/', 'GET');
+export const getBin = (id) => apiRequest(`/inventory/bins/${id}/`, 'GET');
+export const getBinContents = (id) => apiRequest(`/inventory/bins/${id}/contents/`, 'GET');
 
-export const getProductStock = (productId) =>
-  apiRequest(`/inventory/product-stock/${productId}/`, 'GET');
+// Batches
+export const listBatches = () => apiRequest('/inventory/batches/', 'GET');
+export const getBatch = (id) => apiRequest(`/inventory/batches/${id}/`, 'GET');
+export const batchLookup = (params) => {
+  const qs = new URLSearchParams(params).toString();
+  return apiRequest(`/inventory/batches/lookup/?${qs}`, 'GET');
+};
 
-export const listInventory = () =>
-  apiRequest('/inventory/create/', 'GET');
+// Inventory
+export const listInventoryRows = () => apiRequest('/inventory/inventory/', 'GET');
+export const getInventoryRow = (id) => apiRequest(`/inventory/inventory/${id}/`, 'GET');
+
+// Stock
+export const getProductStock = (productId) => 
+  apiRequest(`/inventory/product/${productId}/stock/`, 'GET');
+export const getProductStockByVendor = (productId) => 
+  apiRequest(`/inventory/product/${productId}/by-vendor/`, 'GET');
+export const getCrossVendorPurchase = (productId) => 
+  apiRequest(`/inventory/product/${productId}/cross-vendor/`, 'GET');
+export const removeStockByProduct = (productId, data) => 
+  apiRequest(`/inventory/product/${productId}/remove-stock/`, 'POST', data);
+
+// Stock Movements
+export const listStockMovements = () => 
+  apiRequest('/inventory/stock-movements/', 'GET');
+export const getStockMovementsByProduct = (productId) => 
+  apiRequest(`/inventory/stock-movements/${productId}/`, 'GET');
+
+// Vendor Scoring
+export const getVendorScore = (productId) => 
+  apiRequest(`/inventory/vendor-scores/${productId}/`, 'GET');
 
 /* ================= PURCHASE REQUEST ================= */
 
-export const listPurchaseRequests = () =>
-  apiRequest('/inventory/purchase-requests/', 'GET');
+export const listPurchaseRequests = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return apiRequest(`/inventory/purchase-requests/${qs ? '?' + qs : ''}`, 'GET');
+};
 
-export const createPurchaseRequest = (data) =>
-  apiRequest('/inventory/purchase-requests/', 'POST', data);
+export const getPurchaseRequest = (id) => 
+  apiRequest(`/inventory/purchase-requests/${id}/`, 'GET');
 
-export const managerApprovePR = (prId) =>
-  apiRequest(`/inventory/pr/manager-approve/${prId}/`, 'POST');
+export const createManualPR = (data) => 
+  apiRequest('/inventory/purchase-request/manual/', 'POST', data);
 
-export const financeApprovePR = (prId) =>
-  apiRequest(`/inventory/pr/finance-approve/${prId}/`, 'POST');
+export const managerApprovePR = (id, data = {}) => {
+  // If action is 'reject', use reject endpoint
+  if (data.action === 'reject') {
+    return apiRequest(`/inventory/purchase-requests/${id}/manager-reject/`, 'POST', data);
+  }
+  return apiRequest(`/inventory/purchase-requests/${id}/manager-approve/`, 'POST', data);
+};
+
+export const financeApprovePR = (id, data = { action: 'approve' }) => 
+  apiRequest(`/inventory/purchase-requests/${id}/finance-approve/`, 'POST', data);
+
+// Update purchase request (for manager edits before approval)
+export const updatePurchaseRequest = (id, data) => 
+  apiRequest(`/inventory/purchase-requests/${id}/`, 'PATCH', data);
+
+// Alias for createManualPR to maintain compatibility with PurchaseRequestsPage
+export const createPurchaseRequest = (data) => createManualPR(data);
 
 /* ================= PURCHASE ORDER ================= */
 
-// FIX: was pointing to purchase-requests/ — now hits the real PO endpoint
-export const listPurchaseOrders = () =>
-  apiRequest('/inventory/po-list/', 'GET');
-
-export const getPurchaseOrder = (id) =>
-  apiRequest(`/inventory/po-list/${id}/`, 'GET');
+export const listPurchaseOrders = () => 
+  apiRequest('/inventory/purchase-orders/', 'GET');
+export const getPurchaseOrder = (id) => 
+  apiRequest(`/inventory/purchase-orders/${id}/`, 'GET');
 
 /* ================= ASN ================= */
 
-export const createASN = (data) =>
-  apiRequest('/inventory/create-asn/', 'POST', data);
+export const listASN = () => apiRequest('/inventory/asn/', 'GET');
+export const createASN = (data) => apiRequest('/inventory/asn/create/', 'POST', data);
+export const getASN = (id) => apiRequest(`/inventory/asn/${id}/`, 'GET');
 
-export const listASN = () =>
-  apiRequest('/inventory/asn-list/', 'GET');
-
-export const getASN = (id) =>
-  apiRequest(`/inventory/asn/${id}/`, 'GET');
-
-export const deleteASN = (id) =>
-  apiRequest(`/inventory/asn/${id}/`, 'DELETE');
-
-export const createASNItems = (data) =>
-  apiRequest('/inventory/create-asn-item/', 'POST', data);
-
-export const listASNItems = () =>
-  apiRequest('/inventory/asn-item/', 'GET');
-
-export const getASNItem = (id) =>
-  apiRequest(`/inventory/asn-item/${id}/`, 'GET');
+export const listASNItems = () => apiRequest('/inventory/asn-items/', 'GET');
+export const createASNItem = (data) => apiRequest('/inventory/asn-items/create/', 'POST', data);
+export const getASNItem = (id) => apiRequest(`/inventory/asn-items/${id}/`, 'GET');
 
 /* ================= GRN ================= */
-/* ================= GRN ================= */
 
-// Create GRN (Generic)
-export const createGRN = (data) =>
-  apiRequest('/inventory/create-grn/', 'POST', data);
+// Supervisor
+export const supervisorCreateGRN = (data) => 
+  apiRequest('/inventory/grn/supervisor/create/', 'POST', data);
+export const supervisorGRNList = () => 
+  apiRequest('/inventory/grn/supervisor/my-grns/', 'GET');
+export const supervisorScanBarcode = (grnId, params) => {
+  const qs = new URLSearchParams(params).toString();
+  return apiRequest(`/inventory/grn/${grnId}/scan/?${qs}`, 'GET');
+};
+export const supervisorAddGRNItem = (grnId, data) => 
+  apiRequest(`/inventory/grn/${grnId}/add-item/`, 'POST', data);
 
-// Supervisor creates GRN header
-export const createGRNBySupervisor = (data) =>
-  apiRequest('/inventory/grn/supervisor-create/', 'POST', data);
+// QC
+export const getQCPendingGRNs = () => 
+  apiRequest('/inventory/grn/qc/pending/', 'GET');
+export const qcUpdateGRNItem = (id, data) => 
+  apiRequest(`/inventory/grn-items/${id}/qc/`, 'PUT', data);
+export const qcApproveGRN = (grnId) => 
+  apiRequest(`/inventory/grn/${grnId}/qc-approve/`, 'POST');
 
-// Supervisor adds line items (received_quantity only)
-export const supervisorAddGRNItems = (data) =>
-  apiRequest('/inventory/grn/supervisor-add-items/', 'POST', data);
+// GRN Read
+export const listGRNs = () => apiRequest('/inventory/grn/', 'GET');
+export const getGRN = (id) => apiRequest(`/inventory/grn/${id}/`, 'GET');
+export const getGRNItems = (grnId) => 
+  apiRequest(`/inventory/grn/${grnId}/items/`, 'GET');
+export const getGRNSummary = (grnId) => 
+  apiRequest(`/inventory/grn/${grnId}/summary/`, 'GET');
 
-// List all GRNs
-export const listGRNs = () =>
-  apiRequest('/inventory/grn-list/', 'GET');
+// GRN Items
+export const listGRNItems = () => apiRequest('/inventory/grn-items/', 'GET');
+export const getGRNItem = (id) => apiRequest(`/inventory/grn-items/${id}/`, 'GET');
 
-// Get single GRN
-export const getGRN = (id) =>
-  apiRequest(`/inventory/grn/${id}/`, 'GET');
+// Barcode Decode
+export const decodeGRNBarcode = (data) => 
+  apiRequest('/inventory/grn/decode-barcode/', 'POST', data);
 
-// Get GRN items by GRN ID
-export const getGRNItems = (id) =>
-  apiRequest(`/inventory/grn/${id}/items/`, 'GET');
+/* ================= PUTAWAY PLAN ================= */
 
-// Create GRN items (Generic)
-export const createGRNItems = (data) =>
-  apiRequest('/inventory/create-grn-items/', 'POST', data);
+export const listPendingPutaway = () => 
+  apiRequest('/inventory/putaway/pending/', 'GET');
+export const confirmPutaway = (planId, data) => 
+  apiRequest(`/inventory/putaway/${planId}/confirm/`, 'POST', data);
+export const reassignPutawayBin = (planId, data) => 
+  apiRequest(`/inventory/putaway/${planId}/reassign/`, 'POST', data);
+export const getPutawayByGRN = (grnId) => 
+  apiRequest(`/inventory/grn/${grnId}/putaway-plan/`, 'GET');
 
-// QC updates accepted/rejected quantities on a single item
-export const qcUpdateGRNItem = (id, data) =>
-  apiRequest(`/inventory/grn-item/${id}/qc/`, 'PUT', data);
+/* ================= OUTBOUND ================= */
 
-// Approve GRN (QC final approval)
-export const approveGRN = (id) =>
-  apiRequest(`/inventory/grn/qc-approve/${id}/`, 'POST');
+export const outboundPick = (productId, data) => 
+  apiRequest(`/inventory/outbound/pick/${productId}/`, 'POST', data);
 
-// Get QC pending GRNs
-export const getQCPendingGRNs = () =>
-  apiRequest('/inventory/grn/qc-pending/', 'GET');
+/* ================= BACKWARD COMPATIBILITY ALIASES ================= */
 
-// Get GRNs created by current supervisor
-export const getMyGRNs = () =>
-  apiRequest('/inventory/grn/my-grns/', 'GET');
+// GRN Aliases
+export const getMyGRNs = () => supervisorGRNList();
+export const createGRNBySupervisor = (data) => supervisorCreateGRN(data);
+export const approveGRN = (id) => qcApproveGRN(id);
+export const createGRN = (data) => supervisorCreateGRN(data);
 
-// Get GRN summary (received/accepted/rejected totals)
-export const getGRNSummary = (id) =>
-  apiRequest(`/inventory/grn/${id}/summary/`, 'GET');
+// Inventory Aliases
+export const listInventory = () => listInventoryRows();
+
+// Vendor Agreement Aliases
+export const uploadSmartVendorAgreement = (data) => 
+  apiRequest('/vendors/upload-agreement/', 'POST', data);
